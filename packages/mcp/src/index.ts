@@ -61,9 +61,9 @@ class ContextMcpServer {
 
         // Initialize vector database (LanceDB local storage)
         console.log('[VECTORDB] Using LanceDB for local vector storage');
-        const vectorDatabase = new LanceDBVectorDatabase({
-            uri: process.env.LANCEDB_URI || '~/.claude-context/lancedb'
-        });
+        const home = process.env.HOME || require('os').homedir();
+        const lanceUri = process.env.LANCEDB_URI || `${home}/.claude-context/lancedb`;
+        const vectorDatabase = new LanceDBVectorDatabase({ uri: lanceUri });
 
         // Initialize Claude Context
         this.context = new Context({
