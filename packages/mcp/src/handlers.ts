@@ -19,16 +19,14 @@ export class ToolHandlers {
     }
 
     /**
-     * Sync indexed codebases from Zilliz Cloud collections
-     * This method fetches all collections from the vector database,
-     * gets the first document from each collection to extract codebasePath from metadata,
-     * and updates the snapshot with discovered codebases.
-     * 
-     * Logic: Compare mcp-codebase-snapshot.json with zilliz cloud collections
-     * - If local snapshot has extra directories (not in cloud), remove them
-     * - If local snapshot is missing directories (exist in cloud), ignore them
+     * Sync indexed codebases from cloud collections.
+     * Disabled for local LanceDB — cloud sync destroys local-only indexes
+     * because LanceDB metadata doesn't match the Zilliz Cloud format.
      */
     private async syncIndexedCodebasesFromCloud(): Promise<void> {
+        console.log(`[SYNC-CLOUD] Skipped — using local LanceDB storage`);
+        return;
+        // Original cloud sync logic below (kept for reference if switching back to Milvus)
         try {
             console.log(`[SYNC-CLOUD] 🔄 Syncing indexed codebases from Zilliz Cloud...`);
 

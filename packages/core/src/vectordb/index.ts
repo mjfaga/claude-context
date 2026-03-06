@@ -14,6 +14,7 @@ export {
 // Implementation class exports
 export { MilvusRestfulVectorDatabase, MilvusRestfulConfig } from './milvus-restful-vectordb';
 export { MilvusVectorDatabase, MilvusConfig } from './milvus-vectordb';
+export { LanceDBVectorDatabase, LanceDBConfig } from './lancedb-vectordb';
 export {
     ClusterManager,
     ZillizConfig,
