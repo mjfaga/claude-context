@@ -13,8 +13,8 @@ import {
 } from './types';
 
 export interface LanceDBConfig {
-    uri?: string; // Path to LanceDB database directory
-    consistencyLevel?: 'strong' | 'eventual'; // For future use if needed
+    uri?: string;
+    consistencyLevel?: 'strong' | 'eventual';
 }
 
 interface LanceDBTableSchema extends Record<string, any> {
@@ -40,13 +40,11 @@ export class LanceDBVectorDatabase implements VectorDatabase {
             ...config
         };
 
-        // Start initialization asynchronously without waiting
         this.initializationPromise = this.initialize();
     }
 
     private async initialize(): Promise<void> {
         try {
-            // Ensure directory exists
             const dbPath = path.resolve(this.config.uri!);
             await fs.ensureDir(dbPath);
             
@@ -58,9 +56,6 @@ export class LanceDBVectorDatabase implements VectorDatabase {
         }
     }
 
-    /**
-     * Ensure initialization is complete before method execution
-     */
     protected async ensureInitialized(): Promise<void> {
         await this.initializationPromise;
         if (!this.db) {
@@ -75,14 +70,12 @@ export class LanceDBVectorDatabase implements VectorDatabase {
         console.log('Collection dimension:', dimension);
 
         try {
-            // Check if table already exists
             const tableNames = await this.db!.tableNames();
             if (tableNames.includes(collectionName)) {
                 console.log(`Table '${collectionName}' already exists`);
                 return;
             }
 
-            // Create sample data with correct schema for table creation
             const sampleData: LanceDBTableSchema[] = [{
                 id: '__sample__',
                 vector: new Array(dimension).fill(0),
@@ -94,13 +87,10 @@ export class LanceDBVectorDatabase implements VectorDatabase {
                 metadata: '{}'
             }];
 
-            // Create table with sample data
             const table = await this.db!.createTable(collectionName, sampleData, { mode: 'create' });
-            
-            // Remove sample data
+
             await table.delete("id = '__sample__'");
-            
-            // Cache table reference
+
             this.tables.set(collectionName, table);
 
             console.log(`✅ Created LanceDB table '${collectionName}' with dimension ${dimension}`);
@@ -146,15 +136,11 @@ export class LanceDBVectorDatabase implements VectorDatabase {
         }
     }
 
-    /**
-     * Quote camelCase column names in SQL filter expressions so DataFusion
-     * doesn't lowercase them (e.g. relativePath → "relativePath").
-     */
+    // DataFusion lowercases unquoted camelCase columns, so quote them in filter expressions.
     private quoteFilterColumns(filter: string): string {
         const camelCols = ['relativePath', 'startLine', 'endLine', 'fileExtension'];
         let quoted = filter;
         for (const col of camelCols) {
-            // Match the column name when NOT already inside double quotes
             quoted = quoted.replace(
                 new RegExp(`(?<!")\\b${col}\\b(?!")`, 'g'),
                 `"${col}"`
@@ -164,7 +150,6 @@ export class LanceDBVectorDatabase implements VectorDatabase {
     }
 
     private async getTable(collectionName: string): Promise<any> {
-        // Check cache first
         if (this.tables.has(collectionName)) {
             return this.tables.get(collectionName)!;
         }
@@ -178,14 +163,8 @@ export class LanceDBVectorDatabase implements VectorDatabase {
         }
     }
 
-    /**
-     * Ensure FTS index exists for hybrid search functionality
-     */
     private async ensureFTSIndex(table: any, collectionName: string): Promise<void> {
         try {
-            // Check if FTS index already exists by trying to list indices
-            // LanceDB doesn't have a direct method to check if an index exists,
-            // so we'll attempt to create it and handle the error if it already exists
             console.log(`🔍 Ensuring FTS index exists for collection: ${collectionName}`);
             
             try {
@@ -194,7 +173,7 @@ export class LanceDBVectorDatabase implements VectorDatabase {
                 });
                 console.log(`✅ FTS index created for collection: ${collectionName}`);
             } catch (indexError: any) {
-                // If index already exists, this is expected
+                // LanceDB has no index-exists check, so creation errors with "already exists" are expected.
                 if (indexError.message && indexError.message.includes('already exists')) {
                     console.log(`ℹ️  FTS index already exists for collection: ${collectionName}`);
                 } else {
@@ -246,7 +225,6 @@ export class LanceDBVectorDatabase implements VectorDatabase {
                 .distanceType("cosine")
                 .limit(options?.topK || 10);
 
-            // Apply boolean expression filter if provided
             if (options?.filterExpr && options.filterExpr.trim().length > 0) {
                 query = query.where(this.quoteFilterColumns(options.filterExpr));
             }
@@ -277,8 +255,7 @@ export class LanceDBVectorDatabase implements VectorDatabase {
 
         try {
             const table = await this.getTable(collectionName);
-            
-            // Build filter expression for deletion
+
             const filter = `id IN (${ids.map(id => `'${id}'`).join(', ')})`;
             await table.delete(filter);
 
@@ -297,25 +274,21 @@ export class LanceDBVectorDatabase implements VectorDatabase {
 
             let query = table.query();
 
-            // Apply filter if provided
             if (filter && filter.trim() !== '') {
                 query = query.where(this.quoteFilterColumns(filter));
             }
 
-            // Select specific fields
             if (outputFields.length > 0) {
                 query = query.select(outputFields);
             }
 
-            // Set limit
             if (limit) {
                 query = query.limit(limit);
             }
 
             const results = await query.toArray();
-            
+
             return results.map((result: any) => {
-                // Parse metadata if present
                 if (result.metadata && typeof result.metadata === 'string') {
                     result.metadata = JSON.parse(result.metadata);
                 }
@@ -328,7 +301,6 @@ export class LanceDBVectorDatabase implements VectorDatabase {
     }
 
     async checkCollectionLimit(): Promise<boolean> {
-        // LanceDB has no collection limit — always allowed
         return true;
     }
 
@@ -339,14 +311,12 @@ export class LanceDBVectorDatabase implements VectorDatabase {
         console.log('Collection dimension:', dimension);
 
         try {
-            // Check if table already exists
             const tableNames = await this.db!.tableNames();
             if (tableNames.includes(collectionName)) {
                 console.log(`Hybrid table '${collectionName}' already exists`);
                 return;
             }
 
-            // Create sample data with correct schema for table creation
             const sampleData: LanceDBTableSchema[] = [{
                 id: '__sample__',
                 vector: new Array(dimension).fill(0),
@@ -358,11 +328,9 @@ export class LanceDBVectorDatabase implements VectorDatabase {
                 metadata: '{}'
             }];
 
-            // Create table with sample data
             const table = await this.db!.createTable(collectionName, sampleData, { mode: 'create' });
-            
-            // Keep sample data temporarily for FTS index creation
-            // Create FTS index on content field for hybrid search
+
+            // The sample row stays until the FTS index exists.
             try {
                 console.log(`🔍 Creating FTS index for content field...`);
                 await table.createIndex("content", {
@@ -371,14 +339,11 @@ export class LanceDBVectorDatabase implements VectorDatabase {
                 console.log(`✅ FTS index created successfully for content field`);
             } catch (error: any) {
                 console.error(`❌ Failed to create FTS index for content field:`, error);
-                // Don't continue silently - this is critical for hybrid search
                 throw new Error(`FTS index creation failed: ${error.message || error}`);
             }
             
-            // Now remove sample data after index creation
             await table.delete("id = '__sample__'");
-            
-            // Cache table reference
+
             this.tables.set(collectionName, table);
 
             console.log(`✅ Created LanceDB hybrid table '${collectionName}' with FTS index`);
@@ -389,8 +354,6 @@ export class LanceDBVectorDatabase implements VectorDatabase {
     }
 
     async insertHybrid(collectionName: string, documents: VectorDocument[]): Promise<void> {
-        // For LanceDB, hybrid insert is the same as regular insert
-        // The FTS index automatically indexes the content field
         return this.insert(collectionName, documents);
     }
 
@@ -400,15 +363,10 @@ export class LanceDBVectorDatabase implements VectorDatabase {
         try {
             const table = await this.getTable(collectionName);
             
-            // Ensure FTS index exists for hybrid search
             await this.ensureFTSIndex(table, collectionName);
 
             console.log(`🔍 Preparing hybrid search for collection: ${collectionName}`);
 
-            // For LanceDB, we'll implement hybrid search by combining vector and FTS results
-            // This is a simplified implementation - LanceDB handles more sophisticated hybrid search natively
-
-            // Extract vector and text search requests
             let vectorRequest: HybridSearchRequest | undefined;
             let textRequest: HybridSearchRequest | undefined;
 
@@ -422,7 +380,6 @@ export class LanceDBVectorDatabase implements VectorDatabase {
 
             const limit = options?.limit || vectorRequest?.limit || 10;
 
-            // Perform vector search
             let vectorResults: any[] = [];
             if (vectorRequest && Array.isArray(vectorRequest.data)) {
                 console.log(`🔍 Executing vector search with ${vectorRequest.data.length}D embedding`);
@@ -440,12 +397,10 @@ export class LanceDBVectorDatabase implements VectorDatabase {
                     console.log(`✅ Vector search returned ${vectorResults.length} results`);
                 } catch (vectorError: any) {
                     console.error(`❌ Vector search failed:`, vectorError);
-                    // Continue with empty vector results
                     vectorResults = [];
                 }
             }
 
-            // Perform text search if text request exists
             let textResults: any[] = [];
             if (textRequest && typeof textRequest.data === 'string') {
                 console.log(`🔍 Executing FTS search for query: "${textRequest.data}"`);
@@ -462,15 +417,12 @@ export class LanceDBVectorDatabase implements VectorDatabase {
                     console.log(`✅ FTS search returned ${textResults.length} results`);
                 } catch (ftsError: any) {
                     console.error(`❌ FTS search failed:`, ftsError);
-                    // Continue with just vector search if FTS fails
                     textResults = [];
                 }
             }
 
-            // Simple RRF (Reciprocal Rank Fusion) reranking
             const combinedResults = this.combineSearchResults(vectorResults, textResults, limit);
 
-            // Transform results to HybridSearchResult format
             return combinedResults.map((result: any) => ({
                 document: {
                     id: result.id,
@@ -492,27 +444,21 @@ export class LanceDBVectorDatabase implements VectorDatabase {
         }
     }
 
-    /**
-     * Simple implementation of Reciprocal Rank Fusion for combining search results
-     */
     private combineSearchResults(vectorResults: any[], textResults: any[], limit: number): any[] {
         const k = 60; // RRF parameter
         const scoresMap = new Map<string, { result: any, score: number }>();
 
-        // Add vector search scores
         vectorResults.forEach((result, index) => {
             const id = result.id;
             const rrfScore = 1 / (k + index + 1);
             scoresMap.set(id, { result, score: rrfScore });
         });
 
-        // Add text search scores (combine with existing if present)
         textResults.forEach((result, index) => {
             const id = result.id;
             const rrfScore = 1 / (k + index + 1);
             
             if (scoresMap.has(id)) {
-                // Combine scores
                 const existing = scoresMap.get(id)!;
                 existing.score += rrfScore;
             } else {
@@ -520,7 +466,6 @@ export class LanceDBVectorDatabase implements VectorDatabase {
             }
         });
 
-        // Sort by combined score and return top results
         const combined = Array.from(scoresMap.values())
             .sort((a, b) => b.score - a.score)
             .slice(0, limit)

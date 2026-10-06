@@ -1,7 +1,6 @@
 import * as vscode from 'vscode';
 import { OpenAIEmbedding, OpenAIEmbeddingConfig, VoyageAIEmbedding, VoyageAIEmbeddingConfig, OllamaEmbedding, OllamaEmbeddingConfig, GeminiEmbedding, GeminiEmbeddingConfig, MilvusConfig, SplitterType, SplitterConfig, AstCodeSplitter, LangChainCodeSplitter } from '@zilliz/claude-context-core';
 
-// Simplified Milvus configuration interface for frontend
 export interface MilvusWebConfig {
     address: string;
     token?: string;
@@ -45,7 +44,6 @@ type FieldDefinition = {
     required?: boolean;
 };
 
-// Unified provider configuration
 const EMBEDDING_PROVIDERS = {
     'OpenAI': {
         name: 'OpenAI',
@@ -106,7 +104,6 @@ const EMBEDDING_PROVIDERS = {
     }
 } as const;
 
-// Unified splitter provider configuration
 const SPLITTER_PROVIDERS = {
     'AST': {
         name: 'AST Splitter',
@@ -144,9 +141,6 @@ export class ConfigManager {
         this.context = context;
     }
 
-    /**
-     * Get embedding provider configuration information
-     */
     private static getProviderInfo(provider: string) {
         if (!(provider in EMBEDDING_PROVIDERS)) {
             return null;
@@ -154,9 +148,6 @@ export class ConfigManager {
         return EMBEDDING_PROVIDERS[provider as keyof typeof EMBEDDING_PROVIDERS];
     }
 
-    /**
-     * Get splitter provider configuration information
-     */
     private static getSplitterProviderInfo(provider: string) {
         if (!(provider in SPLITTER_PROVIDERS)) {
             return null;
@@ -164,9 +155,6 @@ export class ConfigManager {
         return SPLITTER_PROVIDERS[provider as keyof typeof SPLITTER_PROVIDERS];
     }
 
-    /**
-     * Build configuration object
-     */
     private buildConfigObject(provider: string, vscodeConfig: vscode.WorkspaceConfiguration): any {
         const providerInfo = ConfigManager.getProviderInfo(provider);
         if (!providerInfo) return null;
@@ -174,7 +162,6 @@ export class ConfigManager {
         const configObject: any = { ...providerInfo.defaultConfig };
         const allFields = [...providerInfo.requiredFields, ...providerInfo.optionalFields];
 
-        // Read values for all fields
         for (const field of allFields) {
             const value = vscodeConfig.get<any>(`embeddingProvider.${field.name}`);
             if (value !== undefined) {
@@ -182,7 +169,6 @@ export class ConfigManager {
             }
         }
 
-        // Validate required fields
         for (const field of providerInfo.requiredFields) {
             if (!configObject[field.name]) {
                 return null;
@@ -192,9 +178,6 @@ export class ConfigManager {
         return configObject;
     }
 
-    /**
-     * Get embedding provider configuration
-     */
     getEmbeddingProviderConfig(): EmbeddingProviderConfig | undefined {
         const config = vscode.workspace.getConfiguration(ConfigManager.CONFIG_KEY);
         const provider = config.get<string>('embeddingProvider.provider');
@@ -210,11 +193,7 @@ export class ConfigManager {
         };
     }
 
-    /**
-     * Save embedding provider configuration
-     */
     async saveEmbeddingProviderConfig(providerConfig: EmbeddingProviderConfig): Promise<void> {
-        // Defensive checks
         if (!providerConfig) {
             throw new Error('Provider config is undefined');
         }
@@ -231,15 +210,13 @@ export class ConfigManager {
             throw new Error(`Unknown provider: ${provider}`);
         }
 
-        // Save provider type
         await workspaceConfig.update('embeddingProvider.provider', provider, vscode.ConfigurationTarget.Global);
 
-        // Save all fields
         const allFields = [...providerInfo.requiredFields, ...providerInfo.optionalFields];
         for (const field of allFields) {
             const value = (config as any)[field.name];
 
-            // For empty strings, save undefined to avoid validation errors
+            // Save undefined for empty strings to avoid validation errors.
             const saveValue = (value === '' || value === null) ? undefined : value;
 
             await workspaceConfig.update(
@@ -250,9 +227,6 @@ export class ConfigManager {
         }
     }
 
-    /**
-     * Create embedding instance
-     */
     static createEmbeddingInstance(provider: string, config: any): any {
         const providerInfo = ConfigManager.getProviderInfo(provider);
         if (!providerInfo) {
@@ -261,9 +235,6 @@ export class ConfigManager {
         return new providerInfo.class(config);
     }
 
-    /**
-     * Get supported embedding providers
-     */
     static getSupportedProviders(): Record<string, {
         name: string;
         models: Record<string, any>;
@@ -274,7 +245,7 @@ export class ConfigManager {
         const result: any = {};
 
         for (const [providerKey, providerInfo] of Object.entries(EMBEDDING_PROVIDERS)) {
-            // Ollama doesn't have getSupportedModels since users input model names manually
+            // Ollama has no getSupportedModels because users type model names manually.
             const models = providerKey === 'Ollama' ? {} : (providerInfo.class as any).getSupportedModels();
 
             result[providerKey] = {
@@ -290,9 +261,6 @@ export class ConfigManager {
     }
 
 
-    /**
-     * Get Milvus frontend configuration
-     */
     getMilvusConfig(): MilvusWebConfig | undefined {
         const config = vscode.workspace.getConfiguration(ConfigManager.CONFIG_KEY);
         const address = config.get<string>('milvus.address');
@@ -306,9 +274,6 @@ export class ConfigManager {
         };
     }
 
-    /**
-     * Save Milvus frontend configuration
-     */
     async saveMilvusConfig(milvusConfig: MilvusWebConfig): Promise<void> {
         if (!milvusConfig) {
             throw new Error('Milvus config is undefined');
@@ -324,33 +289,23 @@ export class ConfigManager {
         await workspaceConfig.update('milvus.token', milvusConfig.token ?? undefined, vscode.ConfigurationTarget.Global);
     }
 
-    /**
-     * Convert frontend configuration to complete MilvusConfig
-     */
     getMilvusFullConfig(): MilvusConfig | undefined {
         const webConfig = this.getMilvusConfig();
         if (!webConfig) return undefined;
 
-        // Convert simplified frontend config to complete config with reasonable defaults
         return {
             address: webConfig.address,
             token: webConfig.token,
-            // Set default values
-            ssl: webConfig.address.startsWith('https://'), // Enable SSL if https address
-            // username and password are usually handled via token, so not set
+            ssl: webConfig.address.startsWith('https://'),
         };
     }
 
-    /**
-     * Get splitter configuration
-     */
     getSplitterConfig(): SplitterConfig | undefined {
         const config = vscode.workspace.getConfiguration(ConfigManager.CONFIG_KEY);
         const type = config.get<string>('splitter.type');
         const chunkSize = config.get<number>('splitter.chunkSize');
         const chunkOverlap = config.get<number>('splitter.chunkOverlap');
 
-        // Return default config if no type is set
         if (!type) {
             return {
                 type: SplitterType.AST,
@@ -366,9 +321,6 @@ export class ConfigManager {
         };
     }
 
-    /**
-     * Save splitter configuration
-     */
     async saveSplitterConfig(splitterConfig: SplitterConfig): Promise<void> {
         if (!splitterConfig) {
             throw new Error('Splitter config is undefined');

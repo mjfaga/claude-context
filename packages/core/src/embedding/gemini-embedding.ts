@@ -4,15 +4,15 @@ import { Embedding, EmbeddingVector } from './base-embedding';
 export interface GeminiEmbeddingConfig {
     model: string;
     apiKey: string;
-    baseURL?: string; // Optional custom API endpoint URL
-    outputDimensionality?: number; // Optional dimension override
+    baseURL?: string;
+    outputDimensionality?: number;
 }
 
 export class GeminiEmbedding extends Embedding {
     private client: GoogleGenAI;
     private config: GeminiEmbeddingConfig;
-    private dimension: number = 3072; // Default dimension for gemini-embedding-001
-    protected maxTokens: number = 2048; // Maximum tokens for Gemini embedding models
+    private dimension: number = 3072;
+    protected maxTokens: number = 2048;
 
     constructor(config: GeminiEmbeddingConfig) {
         super();
@@ -26,10 +26,8 @@ export class GeminiEmbedding extends Embedding {
             }),
         });
 
-        // Set dimension based on model and configuration
         this.updateDimensionForModel(config.model || 'gemini-embedding-001');
 
-        // Override dimension if specified in config
         if (config.outputDimensionality) {
             this.dimension = config.outputDimensionality;
         }
@@ -43,14 +41,12 @@ export class GeminiEmbedding extends Embedding {
             this.dimension = modelInfo.dimension;
             this.maxTokens = modelInfo.contextLength;
         } else {
-            // Use default dimension and context length for unknown models
             this.dimension = 3072;
             this.maxTokens = 2048;
         }
     }
 
     async detectDimension(): Promise<number> {
-        // Gemini doesn't need dynamic detection, return configured dimension
         return this.dimension;
     }
 
@@ -119,56 +115,36 @@ export class GeminiEmbedding extends Embedding {
         return 'Gemini';
     }
 
-    /**
-     * Set model type
-     * @param model Model name
-     */
     setModel(model: string): void {
         this.config.model = model;
         this.updateDimensionForModel(model);
     }
 
-    /**
-     * Set output dimensionality
-     * @param dimension Output dimension (must be supported by the model)
-     */
     setOutputDimensionality(dimension: number): void {
         this.config.outputDimensionality = dimension;
         this.dimension = dimension;
     }
 
-    /**
-     * Get client instance (for advanced usage)
-     */
     getClient(): GoogleGenAI {
         return this.client;
     }
 
-    /**
-     * Get list of supported models
-     */
     static getSupportedModels(): Record<string, { dimension: number; contextLength: number; description: string; supportedDimensions?: number[] }> {
         return {
             'gemini-embedding-001': {
                 dimension: 3072,
                 contextLength: 2048,
                 description: 'Latest Gemini embedding model with state-of-the-art performance (recommended)',
-                supportedDimensions: [3072, 1536, 768, 256] // Matryoshka Representation Learning support
+                supportedDimensions: [3072, 1536, 768, 256]
             }
         };
     }
 
-    /**
-     * Get supported dimensions for the current model
-     */
     getSupportedDimensions(): number[] {
         const modelInfo = GeminiEmbedding.getSupportedModels()[this.config.model || 'gemini-embedding-001'];
         return modelInfo?.supportedDimensions || [this.dimension];
     }
 
-    /**
-     * Validate if a dimension is supported by the current model
-     */
     isDimensionSupported(dimension: number): boolean {
         const supportedDimensions = this.getSupportedDimensions();
         return supportedDimensions.includes(dimension);

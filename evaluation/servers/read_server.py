@@ -1,18 +1,10 @@
 #!/usr/bin/env python3
-"""
-A read_file server using MCP (Model Context Protocol).
-This server provides file reading functionality for text files.
-
-Implementation logic inspired by Gemini CLI's read-file.ts:
-https://github.com/google-gemini/gemini-cli/blob/main/packages/core/src/tools/read-file.ts
-Adapted from TypeScript to Python implementation with text file handling.
-"""
+"""Adapted from Gemini CLI read-file.ts: https://github.com/google-gemini/gemini-cli/blob/main/packages/core/src/tools/read-file.ts"""
 
 import os
 from typing import Dict, Any, Optional
 from mcp.server.fastmcp import FastMCP
 
-# Create the MCP server
 mcp = FastMCP("Read File Server")
 
 
@@ -35,30 +27,23 @@ def read_file(
         - For errors: {"error": "error message"}
     """
     try:
-        # Validate path is absolute
         if not os.path.isabs(path):
             return {"error": f"Path must be absolute: {path}"}
 
-        # Check if file exists
         if not os.path.exists(path):
             return {"error": f"File does not exist: {path}"}
 
-        # Check if it's actually a file
         if os.path.isdir(path):
             return {"error": f"Path is a directory, not a file: {path}"}
 
-        # Get file extension
         _, ext = os.path.splitext(path.lower())
 
-        # Try to read as text file
         try:
-            # Try to read as text with UTF-8 encoding
             with open(path, "r", encoding="utf-8", errors="replace") as file:
                 lines = file.readlines()
                 total_lines = len(lines)
 
                 if offset is not None and limit is not None:
-                    # Validate offset
                     if offset < 0:
                         return {"error": f"Offset must be non-negative: {offset}"}
                     if offset >= total_lines:
@@ -66,12 +51,10 @@ def read_file(
                             "error": f"Offset {offset} is beyond file length {total_lines}"
                         }
 
-                    # Calculate end position
                     start = offset
                     end = min(offset + limit, total_lines)
                     content = "".join(lines[start:end])
 
-                    # Add truncation notice if needed
                     if end < total_lines:
                         content = (
                             f"[File content truncated: showing lines {start + 1}-{end} of {total_lines} total lines...]\n"
@@ -87,7 +70,6 @@ def read_file(
                     "path": path,
                 }
         except UnicodeDecodeError:
-            # If UTF-8 fails, try other common encodings
             for encoding in ["latin-1", "cp1252", "iso-8859-1"]:
                 try:
                     with open(path, "r", encoding=encoding, errors="replace") as file:
@@ -126,7 +108,6 @@ def read_file(
                 except UnicodeDecodeError:
                     continue
 
-            # If all encodings fail, treat as binary
             return {"error": f"Cannot read file as text (encoding issues): {path}"}
 
     except Exception as e:
@@ -146,15 +127,12 @@ def list_directory(path: str) -> Dict[str, Any]:
         - For errors: {"error": "error message"}
     """
     try:
-        # Validate path is absolute
         if not os.path.isabs(path):
             return {"error": f"Path must be absolute: {path}"}
 
-        # Check if directory exists
         if not os.path.exists(path):
             return {"error": f"Directory does not exist: {path}"}
 
-        # Check if it's actually a directory
         if not os.path.isdir(path):
             return {"error": f"Path is not a directory: {path}"}
 
@@ -168,10 +146,8 @@ def list_directory(path: str) -> Dict[str, Any]:
                 elif os.path.isdir(item_path):
                     entries.append({"name": item, "type": "directory", "size": 0})
             except (OSError, PermissionError):
-                # Skip items we can't access
                 continue
 
-        # Sort entries: directories first, then files, both alphabetically
         entries.sort(key=lambda x: (x["type"] == "file", x["name"].lower()))
 
         return {"entries": entries, "path": path, "total_count": len(entries)}
@@ -196,15 +172,12 @@ def directory_tree(path: str, max_depth: Optional[int] = 3) -> Dict[str, Any]:
         - For errors: {"error": "error message"}
     """
     try:
-        # Validate path is absolute
         if not os.path.isabs(path):
             return {"error": f"Path must be absolute: {path}"}
 
-        # Check if directory exists
         if not os.path.exists(path):
             return {"error": f"Directory does not exist: {path}"}
 
-        # Check if it's actually a directory
         if not os.path.isdir(path):
             return {"error": f"Path is not a directory: {path}"}
 
@@ -219,7 +192,6 @@ def directory_tree(path: str, max_depth: Optional[int] = 3) -> Dict[str, Any]:
                     item_path = os.path.join(current_path, item)
                     is_last = i == len(items) - 1
 
-                    # Skip hidden files and common ignore patterns
                     if item.startswith(".") and item not in [
                         ".env",
                         ".gitignore",
@@ -251,7 +223,6 @@ def directory_tree(path: str, max_depth: Optional[int] = 3) -> Dict[str, Any]:
                                 f"{prefix}{'└── ' if is_last else '├── '}{item}\n"
                             )
                     except (OSError, PermissionError):
-                        # Skip items we can't access
                         continue
             except (OSError, PermissionError):
                 pass
@@ -268,5 +239,4 @@ def directory_tree(path: str, max_depth: Optional[int] = 3) -> Dict[str, Any]:
 
 
 if __name__ == "__main__":
-    # Run the server with stdio transport
     mcp.run(transport="stdio")

@@ -1,7 +1,6 @@
 #!/usr/bin/env node
 
-// CRITICAL: Redirect console outputs to stderr IMMEDIATELY to avoid interfering with MCP JSON protocol
-// Only MCP protocol messages should go to stdout
+// Redirect console output to stderr before anything else runs: stdout carries only MCP protocol messages.
 const originalConsoleLog = console.log;
 const originalConsoleWarn = console.warn;
 
@@ -13,8 +12,6 @@ console.warn = (...args: any[]) => {
     process.stderr.write('[WARN] ' + args.join(' ') + '\n');
 };
 
-// console.error already goes to stderr by default
-
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import {
@@ -24,7 +21,6 @@ import {
 import { Context } from "@zilliz/claude-context-core";
 import { LanceDBVectorDatabase } from "@zilliz/claude-context-core";
 
-// Import our modular components
 import { createMcpConfig, logConfigurationSummary, showHelpMessage, ContextMcpConfig } from "./config.js";
 import { createEmbeddingInstance, logEmbeddingProviderInfo } from "./embedding.js";
 import { SnapshotManager } from "./snapshot.js";
@@ -39,7 +35,6 @@ class ContextMcpServer {
     private toolHandlers: ToolHandlers;
 
     constructor(config: ContextMcpConfig) {
-        // Initialize MCP server
         this.server = new Server(
             {
                 name: config.name,
@@ -52,31 +47,26 @@ class ContextMcpServer {
             }
         );
 
-        // Initialize embedding provider
         console.log(`[EMBEDDING] Initializing embedding provider: ${config.embeddingProvider}`);
         console.log(`[EMBEDDING] Using model: ${config.embeddingModel}`);
 
         const embedding = createEmbeddingInstance(config);
         logEmbeddingProviderInfo(config, embedding);
 
-        // Initialize vector database (LanceDB local storage)
         console.log('[VECTORDB] Using LanceDB for local vector storage');
         const home = process.env.HOME || require('os').homedir();
         const lanceUri = process.env.LANCEDB_URI || `${home}/.claude-context/lancedb`;
         const vectorDatabase = new LanceDBVectorDatabase({ uri: lanceUri });
 
-        // Initialize Claude Context
         this.context = new Context({
             embedding,
             vectorDatabase
         });
 
-        // Initialize managers
         this.snapshotManager = new SnapshotManager();
         this.syncManager = new SyncManager(this.context, this.snapshotManager);
         this.toolHandlers = new ToolHandlers(this.context, this.snapshotManager);
 
-        // Load existing codebase snapshot on startup
         this.snapshotManager.loadCodebaseSnapshot();
 
         this.setupTools();
@@ -116,7 +106,6 @@ This tool is versatile and can be used before completing various tasks to retrie
 - You can then use the index_codebase tool to index the codebase before searching again.
 `;
 
-        // Define available tools
         this.server.setRequestHandler(ListToolsRequestSchema, async () => {
             return {
                 tools: [
@@ -225,7 +214,6 @@ This tool is versatile and can be used before completing various tasks to retrie
             };
         });
 
-        // Handle tool execution
         this.server.setRequestHandler(CallToolRequestSchema, async (request) => {
             const { name, arguments: args } = request.params;
 
@@ -256,25 +244,20 @@ This tool is versatile and can be used before completing various tasks to retrie
         console.log("MCP server started and listening on stdio.");
         console.log('[SYNC-DEBUG] Server connection established successfully');
 
-        // Start background sync after server is connected
         console.log('[SYNC-DEBUG] Initializing background sync...');
         this.syncManager.startBackgroundSync();
         console.log('[SYNC-DEBUG] MCP server initialization complete');
     }
 }
 
-// Main execution
 async function main() {
-    // Parse command line arguments
     const args = process.argv.slice(2);
 
-    // Show help if requested
     if (args.includes('--help') || args.includes('-h')) {
         showHelpMessage();
         process.exit(0);
     }
 
-    // Create configuration
     const config = createMcpConfig();
     logConfigurationSummary(config);
 
@@ -282,7 +265,6 @@ async function main() {
     await server.start();
 }
 
-// Handle graceful shutdown
 process.on('SIGINT', () => {
     console.error("Received SIGINT, shutting down gracefully...");
     process.exit(0);
@@ -293,7 +275,6 @@ process.on('SIGTERM', () => {
     process.exit(0);
 });
 
-// Always start the server - this is designed to be the main entry point
 main().catch((error) => {
     console.error("Fatal error:", error);
     process.exit(1);

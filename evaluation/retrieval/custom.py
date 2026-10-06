@@ -35,18 +35,6 @@ class CustomRetrieval(BaseRetrieval):
         output_dir,
         **kwargs,
     ):
-        """
-        Initialize CustomRetrieval with specified retrieval types.
-        
-        Args:
-            llm_type: Type of LLM to use
-            llm_model: LLM model name
-            retrieval_types: List containing "cc", "grep", or both
-            dataset_name_or_path: Dataset path
-            splits: Dataset splits
-            output_dir: Output directory
-            **kwargs: Additional arguments
-        """
         super().__init__(
             dataset_name_or_path=dataset_name_or_path,
             splits=splits,
@@ -54,7 +42,6 @@ class CustomRetrieval(BaseRetrieval):
             **kwargs,
         )
 
-        # Validate retrieval types
         valid_types = {"cc", "grep"}
         if not isinstance(retrieval_types, list):
             raise ValueError("retrieval_types must be a list")
@@ -70,7 +57,6 @@ class CustomRetrieval(BaseRetrieval):
         self.mcp_client = self._create_mcp_client()
 
     def _create_mcp_client(self) -> MultiServerMCPClient:
-        """Create MCP client based on retrieval types"""
         servers = {
             "filesystem": {
                 "command": sys.executable,
@@ -84,11 +70,8 @@ class CustomRetrieval(BaseRetrieval):
             },
         }
 
-        # Add CC server if needed
         if "cc" in self.retrieval_types:
             servers["claude-context"] = {
-                # "command": "node",
-                # "args": [str(project_path / "packages/mcp/dist/index.js")],  # For development environment
                 "command": "npx",
                 "args": ["-y", "@zilliz/claude-context-mcp@0.1.0"],  # For reproduction environment
                 "env": {
@@ -99,7 +82,6 @@ class CustomRetrieval(BaseRetrieval):
                 "transport": "stdio",
             }
 
-        # Add Grep server if needed
         if "grep" in self.retrieval_types:
             servers["grep"] = {
                 "command": sys.executable,
@@ -112,19 +94,15 @@ class CustomRetrieval(BaseRetrieval):
     @asynccontextmanager
     async def mcp_sessions_context(self):
         """Context manager for MCP sessions and tools loading"""
-        # Build session context based on retrieval types
         session_names = ["filesystem", "edit"]
 
-        # Add CC session if needed
         if "cc" in self.retrieval_types:
             session_names.append("claude-context")
 
-        # Add Grep session if needed
         if "grep" in self.retrieval_types:
             session_names.append("grep")
 
-        # Create the appropriate context manager based on which sessions we need
-        if len(session_names) == 2:  # filesystem + edit
+        if len(session_names) == 2:
             async with self.mcp_client.session(
                 "filesystem"
             ) as fs_session, self.mcp_client.session("edit") as edit_session:
@@ -148,7 +126,7 @@ class CustomRetrieval(BaseRetrieval):
                         "claude-context": cc_session,
                     }
                     yield await self._load_tools_from_sessions(sessions)
-            else:  # grep
+            else:
                 async with self.mcp_client.session(
                     "filesystem"
                 ) as fs_session, self.mcp_client.session(
@@ -162,7 +140,7 @@ class CustomRetrieval(BaseRetrieval):
                         "grep": grep_session,
                     }
                     yield await self._load_tools_from_sessions(sessions)
-        else:  # all 4 sessions
+        else:
             async with self.mcp_client.session(
                 "filesystem"
             ) as fs_session, self.mcp_client.session(
@@ -181,25 +159,20 @@ class CustomRetrieval(BaseRetrieval):
                 yield await self._load_tools_from_sessions(sessions)
 
     async def _load_tools_from_sessions(self, sessions: Dict):
-        """Load tools from the provided sessions"""
         fs_tools = await load_mcp_tools(sessions["filesystem"])
         edit_tools = await load_mcp_tools(sessions["edit"])
 
-        # Get basic tools
         edit_tool = next((tool for tool in edit_tools if tool.name == "edit"), None,)
 
-        # Start with filesystem tools
         search_tools = [
             tool
             for tool in fs_tools
             if tool.name in ["read_file", "list_directory", "directory_tree"]
         ]
 
-        # Add edit tool
         if edit_tool:
             search_tools.append(edit_tool)
 
-        # Initialize CC-specific tools
         cc_tools = {
             "index_tool": None,
             "indexing_status_tool": None,
@@ -207,7 +180,6 @@ class CustomRetrieval(BaseRetrieval):
             "search_code_tool": None,
         }
 
-        # Load CC tools if needed
         if "cc" in self.retrieval_types and "claude-context" in sessions:
             cc_tool_list = await load_mcp_tools(sessions["claude-context"])
 
@@ -225,19 +197,15 @@ class CustomRetrieval(BaseRetrieval):
                 (tool for tool in cc_tool_list if tool.name == "search_code"), None
             )
 
-            # Add search code tool to search tools
             if cc_tools["search_code_tool"]:
                 search_tools.append(cc_tools["search_code_tool"])
 
-        # Load Grep tools if needed
         if "grep" in self.retrieval_types and "grep" in sessions:
             grep_tools = await load_mcp_tools(sessions["grep"])
 
-            # Add grep tool (typically the first one is search_text)
             if grep_tools:
                 search_tools.append(grep_tools[0])
 
-        # Return tools as a dictionary for easy access
         return {
             "search_tools": search_tools,
             **cc_tools,
@@ -247,7 +215,6 @@ class CustomRetrieval(BaseRetrieval):
         asyncio.run(self.async_build_index(repo_path))
 
     async def async_build_index(self, repo_path: str) -> Any:
-        """Build index only if CC is enabled"""
         if "cc" not in self.retrieval_types:
             return
 
@@ -304,7 +271,6 @@ class CustomRetrieval(BaseRetrieval):
                     tool_stats,
                 ) = await evaluator.async_run(query, repo_path)
             finally:
-                # Clear index if CC is enabled
                 if "cc" in self.retrieval_types:
                     clear_index_tool = tools["clear_index_tool"]
                     if clear_index_tool:
@@ -332,7 +298,6 @@ class CustomRetrieval(BaseRetrieval):
             commit = instance["base_commit"]
             issue = instance["problem_statement"]
 
-            # Create instance directory
             instance_dir = os.path.join(self.output_dir, instance_id)
             os.makedirs(instance_dir, exist_ok=True)
 
@@ -351,30 +316,25 @@ class CustomRetrieval(BaseRetrieval):
                         tool_stats,
                     ) = await self.async_search(repo_dir, issue, k=20)
 
-                # Extract oracle files from patch
                 oracles = extract_oracle_files_from_patch(instance.get("patch", ""))
 
-                # Prepare result data
                 result = {
                     "instance_id": instance_id,
                     "hits": hits,
                     "oracles": oracles,
                     "token_usage": token_usage,
                     "tool_stats": tool_stats,
-                    "retrieval_types": self.retrieval_types,  # Add info about which retrieval types were used
+                    "retrieval_types": self.retrieval_types,
                 }
 
-                # Save result and token info to JSON file
                 result_file = os.path.join(instance_dir, "result.json")
                 with open(result_file, "w") as f:
                     json.dump(result, f, indent=2)
 
-                # Save conversation log
                 log_file = os.path.join(instance_dir, "conversation.log")
                 with open(log_file, "w") as f:
                     f.write(conversation_summary)
 
-                # Create unified diff file from conversation log
                 try:
                     create_unified_diff_file(instance_dir, conversation_summary)
                     logger.info(f"Created unified diff file for {instance_id}")
@@ -388,7 +348,6 @@ class CustomRetrieval(BaseRetrieval):
                 )
 
             except Exception as e:
-                # Save error stack trace to error.log
                 error_file = os.path.join(instance_dir, "error.log")
                 with open(error_file, "w") as f:
                     f.write(f"Error processing {instance_id}: {e}\n\n")

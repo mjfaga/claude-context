@@ -1,13 +1,4 @@
-/**
- * Milvus RESTful Vector Database Implementation
- * 
- * This RESTful implementation of Milvus vector database is specifically designed for 
- * environments with strict dependency constraints, e.g. VSCode Extensions, Chrome Extensions, etc.
- * 
- * The standard Milvus gRPC implementation requires some dependencies and modules
- * that are not available or restricted in these constrained environments. This RESTful
- * implementation uses only HTTP requests, making it compatible with them.
- */
+// HTTP-only Milvus client for environments that cannot load the gRPC dependencies (VSCode and Chrome extensions).
 
 import {
     VectorDocument,
@@ -29,11 +20,6 @@ export interface MilvusRestfulConfig {
     database?: string;
 }
 
-/**
- * TODO: Change this usage to checkCollectionLimit()
- * Wrapper function to handle collection creation with limit detection
- * This is the single point where collection limit errors are detected and handled
- */
 async function createCollectionWithLimitCheck(
     makeRequestFn: (endpoint: string, method: 'GET' | 'POST', data?: any) => Promise<any>,
     collectionSchema: any
@@ -41,22 +27,15 @@ async function createCollectionWithLimitCheck(
     try {
         await makeRequestFn('/collections/create', 'POST', collectionSchema);
     } catch (error: any) {
-        // Check if the error message contains the collection limit exceeded pattern
         const errorMessage = error.message || error.toString() || '';
         if (/exceeded the limit number of collections/i.test(errorMessage)) {
-            // Throw the exact message string, not an Error object
+            // Throw the exact message string, not an Error object, so callers can match COLLECTION_LIMIT_MESSAGE.
             throw COLLECTION_LIMIT_MESSAGE;
         }
-        // Re-throw other errors as-is
         throw error;
     }
 }
 
-/**
- * Milvus Vector Database implementation using REST API
- * This implementation is designed for environments where gRPC is not available,
- * such as VSCode extensions or browser environments.
- */
 export class MilvusRestfulVectorDatabase implements VectorDatabase {
     protected config: MilvusRestfulConfig;
     private baseUrl: string | null = null;
@@ -65,7 +44,6 @@ export class MilvusRestfulVectorDatabase implements VectorDatabase {
     constructor(config: MilvusRestfulConfig) {
         this.config = config;
 
-        // Start initialization asynchronously without waiting
         this.initializationPromise = this.initialize();
     }
 
@@ -75,7 +53,6 @@ export class MilvusRestfulVectorDatabase implements VectorDatabase {
     }
 
     private async initializeClient(address: string): Promise<void> {
-        // Ensure address has protocol prefix
         let processedAddress = address;
         if (!processedAddress.startsWith('http://') && !processedAddress.startsWith('https://')) {
             processedAddress = `http://${processedAddress}`;
@@ -86,14 +63,9 @@ export class MilvusRestfulVectorDatabase implements VectorDatabase {
         console.log(`🔌 Connecting to Milvus REST API at: ${processedAddress}`);
     }
 
-    /**
-     * Resolve address from config or token
-     * Common logic for both gRPC and REST implementations
-     */
     protected async resolveAddress(): Promise<string> {
         let finalConfig = { ...this.config };
 
-        // If address is not provided, get it using token
         if (!finalConfig.address && finalConfig.token) {
             finalConfig.address = await ClusterManager.getAddressFromToken(finalConfig.token);
         }
@@ -105,9 +77,6 @@ export class MilvusRestfulVectorDatabase implements VectorDatabase {
         return finalConfig.address;
     }
 
-    /**
-     * Ensure initialization is complete before method execution
-     */
     protected async ensureInitialized(): Promise<void> {
         await this.initializationPromise;
         if (!this.baseUrl) {
@@ -115,13 +84,9 @@ export class MilvusRestfulVectorDatabase implements VectorDatabase {
         }
     }
 
-    /**
-     * Ensure collection is loaded before search/query operations
-     */
     protected async ensureLoaded(collectionName: string): Promise<void> {
         try {
             const restfulConfig = this.config as MilvusRestfulConfig;
-            // Check if collection is loaded
             const response = await this.makeRequest('/collections/get_load_state', 'POST', {
                 collectionName,
                 dbName: restfulConfig.database
@@ -138,9 +103,6 @@ export class MilvusRestfulVectorDatabase implements VectorDatabase {
         }
     }
 
-    /**
-     * Make HTTP request to Milvus REST API
-     */
     private async makeRequest(endpoint: string, method: 'GET' | 'POST' = 'POST', data?: any): Promise<any> {
         const url = `${this.baseUrl}${endpoint}`;
 
@@ -149,7 +111,6 @@ export class MilvusRestfulVectorDatabase implements VectorDatabase {
             'Accept': 'application/json'
         };
 
-        // Handle authentication
         if (this.config.token) {
             headers['Authorization'] = `Bearer ${this.config.token}`;
         } else if (this.config.username && this.config.password) {
@@ -190,9 +151,7 @@ export class MilvusRestfulVectorDatabase implements VectorDatabase {
 
         try {
             const restfulConfig = this.config as MilvusRestfulConfig;
-            // Build collection schema based on the original milvus-vectordb.ts implementation
-            // Note: REST API doesn't support description parameter in collection creation
-            // Unlike gRPC version, the description parameter is ignored in REST API
+            // The REST API ignores the description parameter on collection creation.
             const collectionSchema = {
                 collectionName,
                 dbName: restfulConfig.database,
@@ -254,13 +213,10 @@ export class MilvusRestfulVectorDatabase implements VectorDatabase {
                 }
             };
 
-            // Step 1: Create collection with schema
             await createCollectionWithLimitCheck(this.makeRequest.bind(this), collectionSchema);
 
-            // Step 2: Create index for vector field (separate API call)
             await this.createIndex(collectionName);
 
-            // Step 3: Load collection to memory for searching
             await this.loadCollection(collectionName);
 
         } catch (error) {
@@ -269,9 +225,6 @@ export class MilvusRestfulVectorDatabase implements VectorDatabase {
         }
     }
 
-    /**
-     * Create index for vector field using the Index Create API
-     */
     private async createIndex(collectionName: string): Promise<void> {
         try {
             const restfulConfig = this.config as MilvusRestfulConfig;
@@ -295,9 +248,6 @@ export class MilvusRestfulVectorDatabase implements VectorDatabase {
         }
     }
 
-    /**
-     * Load collection to memory for searching
-     */
     private async loadCollection(collectionName: string): Promise<void> {
         try {
             const restfulConfig = this.config as MilvusRestfulConfig;
@@ -366,7 +316,6 @@ export class MilvusRestfulVectorDatabase implements VectorDatabase {
 
         try {
             const restfulConfig = this.config as MilvusRestfulConfig;
-            // Transform VectorDocument array to Milvus entity format
             const data = documents.map(doc => ({
                 id: doc.id,
                 vector: doc.vector,
@@ -375,7 +324,7 @@ export class MilvusRestfulVectorDatabase implements VectorDatabase {
                 startLine: doc.startLine,
                 endLine: doc.endLine,
                 fileExtension: doc.fileExtension,
-                metadata: JSON.stringify(doc.metadata) // Convert metadata object to JSON string
+                metadata: JSON.stringify(doc.metadata)
             }));
 
             const insertRequest = {
@@ -400,12 +349,11 @@ export class MilvusRestfulVectorDatabase implements VectorDatabase {
 
         try {
             const restfulConfig = this.config as MilvusRestfulConfig;
-            // Build search request according to Milvus REST API specification
             const searchRequest: any = {
                 collectionName,
                 dbName: restfulConfig.database,
-                data: [queryVector], // Array of query vectors
-                annsField: "vector", // Vector field name
+                data: [queryVector],
+                annsField: "vector",
                 limit: topK,
                 outputFields: [
                     "content",
@@ -416,21 +364,18 @@ export class MilvusRestfulVectorDatabase implements VectorDatabase {
                     "metadata"
                 ],
                 searchParams: {
-                    metricType: "COSINE", // Match the index metric type
+                    metricType: "COSINE",
                     params: {}
                 }
             };
 
-            // Apply boolean expression filter if provided (e.g., fileExtension in ['.ts','.py']) 
             if (options?.filterExpr && options.filterExpr.trim().length > 0) {
                 searchRequest.filter = options.filterExpr;
             }
 
             const response = await this.makeRequest('/entities/search', 'POST', searchRequest);
 
-            // Transform response to VectorSearchResult format
             const results: VectorSearchResult[] = (response.data || []).map((item: any) => {
-                // Parse metadata from JSON string
                 let metadata = {};
                 try {
                     metadata = JSON.parse(item.metadata || '{}');
@@ -442,7 +387,7 @@ export class MilvusRestfulVectorDatabase implements VectorDatabase {
                 return {
                     document: {
                         id: item.id?.toString() || '',
-                        vector: queryVector, // Vector not returned in search results
+                        vector: queryVector,
                         content: item.content || '',
                         relativePath: item.relativePath || '',
                         startLine: item.startLine || 0,
@@ -468,8 +413,6 @@ export class MilvusRestfulVectorDatabase implements VectorDatabase {
 
         try {
             const restfulConfig = this.config as MilvusRestfulConfig;
-            // Build filter expression for deleting by IDs
-            // Format: id in ["id1", "id2", "id3"]
             const filter = `id in [${ids.map(id => `"${id}"`).join(', ')}]`;
 
             const deleteRequest = {
@@ -497,7 +440,7 @@ export class MilvusRestfulVectorDatabase implements VectorDatabase {
                 dbName: restfulConfig.database,
                 filter,
                 outputFields,
-                limit: limit || 16384, // Use provided limit or default
+                limit: limit || 16384,
                 offset: 0
             };
 
@@ -595,13 +538,10 @@ export class MilvusRestfulVectorDatabase implements VectorDatabase {
                 }
             };
 
-            // Step 1: Create collection with schema and functions
             await createCollectionWithLimitCheck(this.makeRequest.bind(this), collectionSchema);
 
-            // Step 2: Create indexes for both vector fields
             await this.createHybridIndexes(collectionName);
 
-            // Step 3: Load collection to memory for searching
             await this.loadCollection(collectionName);
 
         } catch (error) {
@@ -614,7 +554,6 @@ export class MilvusRestfulVectorDatabase implements VectorDatabase {
         try {
             const restfulConfig = this.config as MilvusRestfulConfig;
 
-            // Create index for dense vector
             const denseIndexParams = {
                 collectionName,
                 dbName: restfulConfig.database,
@@ -629,7 +568,6 @@ export class MilvusRestfulVectorDatabase implements VectorDatabase {
             };
             await this.makeRequest('/indexes/create', 'POST', denseIndexParams);
 
-            // Create index for sparse vector
             const sparseIndexParams = {
                 collectionName,
                 dbName: restfulConfig.database,
@@ -695,11 +633,10 @@ export class MilvusRestfulVectorDatabase implements VectorDatabase {
 
             console.log(`[MilvusRestfulDB] 🔍 Preparing hybrid search for collection: ${collectionName}`);
 
-            // Prepare search requests according to Milvus REST API hybrid search specification
-            // For dense vector search - data must be array of vectors: [[0.1, 0.2, 0.3, ...]]
+            // Dense search data is an array of vectors; sparse search data is an array of query strings.
             const search_param_1: any = {
                 data: Array.isArray(searchRequests[0].data) ? [searchRequests[0].data] : [[searchRequests[0].data]],
-                annsField: searchRequests[0].anns_field, // "vector"
+                annsField: searchRequests[0].anns_field,
                 limit: searchRequests[0].limit,
                 outputFields: ["*"],
                 searchParams: {
@@ -708,10 +645,9 @@ export class MilvusRestfulVectorDatabase implements VectorDatabase {
                 }
             };
 
-            // For sparse vector search - data must be array of queries: ["query text"]
             const search_param_2: any = {
                 data: Array.isArray(searchRequests[1].data) ? searchRequests[1].data : [searchRequests[1].data],
-                annsField: searchRequests[1].anns_field, // "sparse_vector"
+                annsField: searchRequests[1].anns_field,
                 limit: searchRequests[1].limit,
                 outputFields: ["*"],
                 searchParams: {
@@ -720,7 +656,6 @@ export class MilvusRestfulVectorDatabase implements VectorDatabase {
                 }
             };
 
-            // Apply filter to both search parameters if provided
             if (options?.filterExpr && options.filterExpr.trim().length > 0) {
                 search_param_1.filter = options.filterExpr;
                 search_param_2.filter = options.filterExpr;
@@ -765,13 +700,12 @@ export class MilvusRestfulVectorDatabase implements VectorDatabase {
             const results = response.data || [];
             console.log(`[MilvusRestfulDB] ✅ Found ${results.length} results from hybrid search`);
 
-            // Transform response to HybridSearchResult format
             return results.map((result: any) => ({
                 document: {
                     id: result.id,
                     content: result.content,
-                    vector: [], // Vector not returned in search results
-                    sparse_vector: [], // Vector not returned in search results
+                    vector: [],
+                    sparse_vector: [],
                     relativePath: result.relativePath,
                     startLine: result.startLine,
                     endLine: result.endLine,
@@ -787,14 +721,7 @@ export class MilvusRestfulVectorDatabase implements VectorDatabase {
         }
     }
 
-    /**
-     * Check collection limit
-     * Returns true if collection can be created, false if limit exceeded
-     * TODO: Implement proper collection limit checking for REST API
-     */
     async checkCollectionLimit(): Promise<boolean> {
-        // TODO: Implement REST API version of collection limit checking
-        // For now, always return true to maintain compatibility
         console.warn('[MilvusRestfulDB] ⚠️  checkCollectionLimit not implemented for REST API - returning true');
         return true;
     }

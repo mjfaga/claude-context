@@ -1,5 +1,4 @@
-// Stub implementation for MilvusVectorDatabase to avoid gRPC dependencies in VSCode extension
-// This file replaces the actual milvus-vectordb.ts when bundling for VSCode
+// Replaces milvus-vectordb.ts when bundling for VSCode to avoid the gRPC dependencies.
 
 class MilvusVectorDatabase {
     constructor(config) {

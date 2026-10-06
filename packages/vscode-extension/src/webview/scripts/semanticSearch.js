@@ -1,26 +1,17 @@
-/**
- * Semantic Search Webview Controller
- * Handles all interactions between the webview and the VSCode extension
- */
 class SemanticSearchController {
     constructor() {
         this.vscode = acquireVsCodeApi();
         this.initializeElements();
         this.bindEvents();
-        this.initializeDefaultProviders(); // Ensure providers are available
+        this.initializeDefaultProviders();
         this.checkIndexStatus();
 
-        // Request config immediately to get proper provider data
         setTimeout(() => {
             this.requestConfig();
         }, 100);
     }
 
-    /**
-     * Initialize DOM elements
-     */
     initializeElements() {
-        // Search view elements
         this.searchInput = document.getElementById('searchInput');
         this.extFilterInput = document.getElementById('extFilterInput');
         this.searchButton = document.getElementById('searchButton');
@@ -30,12 +21,10 @@ class SemanticSearchController {
         this.resultsHeader = document.getElementById('resultsHeader');
         this.resultsList = document.getElementById('resultsList');
 
-        // View elements
         this.searchView = document.getElementById('searchView');
         this.settingsView = document.getElementById('settingsView');
         this.backButton = document.getElementById('backButton');
 
-        // Settings elements
         this.providerSelect = document.getElementById('provider');
         this.dynamicFields = document.getElementById('dynamicFields');
         this.splitterTypeSelect = document.getElementById('splitterType');
@@ -48,15 +37,11 @@ class SemanticSearchController {
         this.statusDiv = document.getElementById('status');
         this.configForm = document.getElementById('configForm');
 
-        // Current config state
         this.currentConfig = null;
         this.supportedProviders = {};
-        this.dynamicFieldElements = new Map(); // Store dynamic field elements
+        this.dynamicFieldElements = new Map();
     }
 
-    /**
-     * Bind event listeners
-     */
     bindEvents() {
         this.searchButton.addEventListener('click', () => this.performSearch());
         this.indexButton.addEventListener('click', () => this.performIndex());
@@ -69,7 +54,6 @@ class SemanticSearchController {
             }
         });
 
-        // Settings event listeners
         this.providerSelect.addEventListener('change', () => this.handleProviderChange());
         this.splitterTypeSelect.addEventListener('change', () => this.validateForm());
         this.chunkSizeInput.addEventListener('input', () => this.validateForm());
@@ -79,16 +63,11 @@ class SemanticSearchController {
         this.testBtn.addEventListener('click', () => this.handleTestConnection());
         this.configForm.addEventListener('submit', (e) => this.handleFormSubmit(e));
 
-        // Handle messages from extension
         window.addEventListener('message', (event) => this.handleMessage(event));
 
-        // Check index status on load
         window.addEventListener('load', () => this.checkIndexStatus());
     }
 
-    /**
-     * Perform search operation
-     */
     performSearch() {
         const text = this.searchInput.value.trim();
         const extFilterRaw = (this.extFilterInput?.value || '').trim();
@@ -104,9 +83,6 @@ class SemanticSearchController {
         }
     }
 
-    /**
-     * Perform index operation
-     */
     performIndex() {
         this.indexButton.textContent = 'Indexing...';
         this.indexButton.disabled = true;
@@ -115,54 +91,35 @@ class SemanticSearchController {
         });
     }
 
-    /**
-     * Check index status
-     */
     checkIndexStatus() {
         this.vscode.postMessage({
             command: 'checkIndex'
         });
     }
 
-    /**
-     * Show settings view
-     */
     showSettingsView() {
         this.searchView.style.display = 'none';
         this.settingsView.style.display = 'block';
 
-        // Add default providers if not already loaded
         this.initializeDefaultProviders();
         this.requestConfig();
     }
 
-    /**
-     * Show search view
-     */
     showSearchView() {
         this.settingsView.style.display = 'none';
         this.searchView.style.display = 'block';
     }
 
-    /**
-     * Request config from extension
-     */
     requestConfig() {
         this.vscode.postMessage({
             command: 'getConfig'
         });
     }
 
-    /**
- * Initialize default providers to ensure they show up even if config loading fails
- */
     initializeDefaultProviders() {
-        // Only initialize if providers haven't been loaded yet
         if (this.providerSelect.children.length <= 1) {
-            // Clear existing options and add placeholder
             this.providerSelect.innerHTML = '<option value="">Please select...</option>';
 
-            // Add basic provider options (models will be loaded from backend)
             const defaultProviders = [
                 { value: 'OpenAI', text: 'OpenAI' },
                 { value: 'VoyageAI', text: 'VoyageAI' },
@@ -276,7 +233,6 @@ class SemanticSearchController {
 
                 if (message.success) {
                     this.showStatus(message.message, 'success');
-                    // Auto return to search view after successful save
                     setTimeout(() => this.showSearchView(), 1500);
                 } else {
                     this.showStatus(message.message, 'error');
@@ -299,17 +255,14 @@ class SemanticSearchController {
         }
     }
 
-    // Settings methods
     handleProviderChange() {
         const selectedProvider = this.providerSelect.value;
 
-        // Clear existing dynamic fields
         this.clearDynamicFields();
 
         if (selectedProvider && this.supportedProviders[selectedProvider]) {
             this.generateDynamicFields(selectedProvider);
         } else if (selectedProvider) {
-            // If we have a selected provider but no supportedProviders data, request config
             this.requestConfig();
         }
 
@@ -318,17 +271,11 @@ class SemanticSearchController {
 
 
 
-    /**
-     * Clear all dynamic form fields
-     */
     clearDynamicFields() {
         this.dynamicFields.innerHTML = '';
         this.dynamicFieldElements.clear();
     }
 
-    /**
-     * Generate dynamic form fields based on provider configuration
-     */
     generateDynamicFields(provider) {
         const providerInfo = this.supportedProviders[provider];
 
@@ -350,13 +297,11 @@ class SemanticSearchController {
                 this.dynamicFields.appendChild(fieldElement.container);
                 this.dynamicFieldElements.set(field.name, fieldElement);
 
-                // Add event listeners
                 if (fieldElement.input) {
                     fieldElement.input.addEventListener('input', () => this.validateForm());
                     fieldElement.input.addEventListener('change', () => this.validateForm());
                 }
 
-                // Add event listeners for select-with-custom model inputs
                 if (fieldElement.selectElement) {
                     fieldElement.selectElement.addEventListener('change', () => this.validateForm());
                 }
@@ -368,13 +313,9 @@ class SemanticSearchController {
             }
         });
 
-        // Load current values if available
         this.loadCurrentValues(provider);
     }
 
-    /**
-     * Create a form field element based on field definition
-     */
     createFormField(field, providerInfo) {
         const container = document.createElement('div');
         container.className = 'form-group';
@@ -387,25 +328,21 @@ class SemanticSearchController {
         let input;
 
         if (field.name === 'model' && field.inputType === 'select') {
-            // Special handling for model field with select type - create dropdown
             input = document.createElement('select');
             input.id = field.name;
             input.required = field.required || false;
 
-            // Add default option
             const defaultOption = document.createElement('option');
             defaultOption.value = '';
             defaultOption.textContent = 'Please select...';
             input.appendChild(defaultOption);
 
-            // Populate with models
             const models = providerInfo.models || {};
             Object.entries(models).forEach(([modelId, modelInfo]) => {
                 const option = document.createElement('option');
                 option.value = modelId;
                 option.textContent = modelId;
 
-                // Keep description as tooltip if available
                 if (modelInfo && modelInfo.description) {
                     option.title = modelInfo.description;
                 }
@@ -413,28 +350,23 @@ class SemanticSearchController {
                 input.appendChild(option);
             });
         } else if (field.name === 'model' && field.inputType === 'select-with-custom') {
-            // Create a container for both select and custom input
             const inputContainer = document.createElement('div');
             inputContainer.className = 'model-input-container';
 
-            // Create select dropdown
             const selectElement = document.createElement('select');
             selectElement.id = field.name + '_select';
             selectElement.className = 'model-select';
 
-            // Add default option
             const defaultOption = document.createElement('option');
             defaultOption.value = '';
             defaultOption.textContent = 'Please select...';
             selectElement.appendChild(defaultOption);
 
-            // Add custom option
             const customOption = document.createElement('option');
             customOption.value = 'custom';
             customOption.textContent = 'Custom model...';
             selectElement.appendChild(customOption);
 
-            // Populate with predefined models
             const models = providerInfo.models || {};
             Object.entries(models).forEach(([modelId, modelInfo]) => {
                 const option = document.createElement('option');
@@ -448,7 +380,6 @@ class SemanticSearchController {
                 selectElement.appendChild(option);
             });
 
-            // Create custom input field (initially hidden)
             const customInput = document.createElement('input');
             customInput.type = 'text';
             customInput.id = field.name + '_custom';
@@ -457,13 +388,11 @@ class SemanticSearchController {
             customInput.style.display = 'none';
             customInput.style.marginTop = '8px';
 
-            // Create the main input that will hold the final value
             input = document.createElement('input');
             input.type = 'hidden';
             input.id = field.name;
             input.required = field.required || false;
 
-            // Add event listeners
             selectElement.addEventListener('change', (e) => {
                 if (e.target.value === 'custom') {
                     customInput.style.display = 'block';
@@ -495,7 +424,6 @@ class SemanticSearchController {
                 customInput
             };
         } else {
-            // Create input based on inputType
             input = document.createElement('input');
             input.id = field.name;
             input.required = field.required || false;
@@ -527,17 +455,12 @@ class SemanticSearchController {
         };
     }
 
-    /**
-     * Load current values into dynamic fields
-     */
     loadCurrentValues(provider) {
         if (this.currentConfig && this.currentConfig.provider === provider && this.currentConfig.config) {
             this.dynamicFieldElements.forEach((fieldElement, fieldName) => {
                 const value = this.currentConfig.config[fieldName];
                 if (value !== undefined && fieldElement.input) {
-                    // Handle select-with-custom model fields
                     if (fieldElement.selectElement && fieldElement.customInput) {
-                        // Check if the value matches any predefined option
                         const selectElement = fieldElement.selectElement;
                         let foundMatch = false;
 
@@ -550,7 +473,6 @@ class SemanticSearchController {
                             }
                         }
 
-                        // If no match found, use custom input
                         if (!foundMatch && value) {
                             selectElement.value = 'custom';
                             fieldElement.customInput.value = value;
@@ -559,7 +481,6 @@ class SemanticSearchController {
                             fieldElement.input.value = value;
                         }
                     } else {
-                        // Regular input field
                         fieldElement.input.value = value;
                     }
                 }
@@ -571,7 +492,6 @@ class SemanticSearchController {
         const hasProvider = !!this.providerSelect.value;
         const hasMilvusAddress = !!this.milvusAddressInput.value.trim();
 
-        // Check all required dynamic fields
         let hasAllRequiredFields = true;
         if (hasProvider && this.supportedProviders[this.providerSelect.value]) {
             const providerInfo = this.supportedProviders[this.providerSelect.value];
@@ -586,9 +506,7 @@ class SemanticSearchController {
             hasAllRequiredFields = false;
         }
 
-        // Test button only needs embedding config
         const canTestEmbedding = hasProvider && hasAllRequiredFields;
-        // Save button needs all config
         const canSave = hasProvider && hasAllRequiredFields && hasMilvusAddress;
 
         this.testBtn.disabled = !canTestEmbedding;
@@ -602,7 +520,6 @@ class SemanticSearchController {
             return;
         }
 
-        // Collect config from dynamic fields
         const config = this.collectDynamicFieldValues();
         if (!config) {
             this.showStatus('Please complete all required fields', 'error');
@@ -624,9 +541,6 @@ class SemanticSearchController {
         });
     }
 
-    /**
-     * Collect values from all dynamic fields
-     */
     collectDynamicFieldValues() {
         const provider = this.providerSelect.value;
         if (!provider || !this.supportedProviders[provider]) {
@@ -636,16 +550,14 @@ class SemanticSearchController {
         const config = {};
         const providerInfo = this.supportedProviders[provider];
 
-        // Check required fields
         for (const field of providerInfo.requiredFields) {
             const fieldElement = this.dynamicFieldElements.get(field.name);
             if (!fieldElement || !fieldElement.input.value.trim()) {
-                return null; // Missing required field
+                return null;
             }
             config[field.name] = fieldElement.input.value.trim();
         }
 
-        // Add optional fields if they have values
         for (const field of providerInfo.optionalFields) {
             const fieldElement = this.dynamicFieldElements.get(field.name);
             if (fieldElement && fieldElement.input.value.trim()) {
@@ -684,7 +596,6 @@ class SemanticSearchController {
             address: this.milvusAddressInput.value.trim()
         };
 
-        // Only add token if it's provided and not empty
         const milvusToken = this.milvusTokenInput.value.trim();
         if (milvusToken) {
             milvusConfig.token = milvusToken;
@@ -722,7 +633,6 @@ class SemanticSearchController {
             return false;
         }
 
-        // Validate splitter configuration
         if (!config.splitterConfig.type) {
             this.showStatus('Please select a splitter type', 'error');
             return false;
@@ -761,11 +671,9 @@ class SemanticSearchController {
     loadConfig(config, providers, milvusConfig, splitterConfig) {
         this.currentConfig = config;
 
-        // Only update providers if we actually received them from backend
         if (providers && Object.keys(providers).length > 0) {
             this.supportedProviders = providers;
 
-            // Update provider select with backend data
             this.providerSelect.innerHTML = '<option value="">Please select...</option>';
             Object.entries(providers).forEach(([providerId, providerInfo]) => {
                 const option = document.createElement('option');
@@ -774,7 +682,6 @@ class SemanticSearchController {
                 this.providerSelect.appendChild(option);
             });
         } else {
-            // Request config again if we don't have provider data
             setTimeout(() => this.requestConfig(), 100);
         }
 
@@ -783,19 +690,16 @@ class SemanticSearchController {
             this.handleProviderChange();
         }
 
-        // Load Milvus config
         if (milvusConfig) {
             this.milvusAddressInput.value = milvusConfig.address || '';
             this.milvusTokenInput.value = milvusConfig.token || '';
         }
 
-        // Load splitter config
         if (splitterConfig) {
             this.splitterTypeSelect.value = splitterConfig.type || 'langchain';
             this.chunkSizeInput.value = splitterConfig.chunkSize || 1000;
             this.chunkOverlapInput.value = splitterConfig.chunkOverlap || 200;
         } else {
-            // Set default values
             this.splitterTypeSelect.value = 'langchain';
             this.chunkSizeInput.value = 1000;
             this.chunkOverlapInput.value = 200;
@@ -805,7 +709,6 @@ class SemanticSearchController {
     }
 }
 
-// Initialize the controller when the DOM is loaded
 let searchController;
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', () => {

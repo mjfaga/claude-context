@@ -1,8 +1,5 @@
 import * as path from "path";
 
-/**
- * Truncate content to specified length
- */
 export function truncateContent(content: string, maxLength: number): string {
     if (content.length <= maxLength) {
         return content;
@@ -10,16 +7,11 @@ export function truncateContent(content: string, maxLength: number): string {
     return content.substring(0, maxLength) + '...';
 }
 
-/**
- * Ensure path is absolute. If relative path is provided, resolve it properly.
- */
 export function ensureAbsolutePath(inputPath: string): string {
-    // If already absolute, return as is
     if (path.isAbsolute(inputPath)) {
         return inputPath;
     }
 
-    // For relative paths, resolve to absolute path
     const resolved = path.resolve(inputPath);
     return resolved;
 }

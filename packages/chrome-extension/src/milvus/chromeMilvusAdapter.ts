@@ -1,8 +1,5 @@
-// Import core types and implementation
 import { MilvusConfig, MilvusConfigManager } from '../config/milvusConfig';
 
-// We'll create a simplified version that works in Chrome extension environment
-// Import types from a stub file instead of the core package
 import { VectorDocument, VectorSearchResult, SearchOptions } from '../stubs/milvus-vectordb-stub';
 import { MilvusRestfulVectorDatabase } from '../stubs/milvus-vectordb-stub';
 
@@ -28,11 +25,6 @@ export interface SearchResult {
     score: number;
 }
 
-/**
- * Chrome Extension adapter for Milvus RESTful Vector Database
- * This class wraps the core MilvusRestfulVectorDatabase to provide
- * Chrome extension specific functionality
- */
 export class ChromeMilvusAdapter {
     private milvusDb: MilvusRestfulVectorDatabase | null = null;
     private collectionName: string;
@@ -41,16 +33,12 @@ export class ChromeMilvusAdapter {
         this.collectionName = collectionName;
     }
 
-    /**
-     * Initialize connection to Milvus
-     */
     async initialize(): Promise<void> {
         const config = await MilvusConfigManager.getMilvusConfig();
         if (!config || !MilvusConfigManager.validateMilvusConfig(config)) {
             throw new Error('Invalid or missing Milvus configuration');
         }
 
-        // Convert our config to core format
         const coreConfig = {
             address: config.address,
             token: config.token,
@@ -63,9 +51,6 @@ export class ChromeMilvusAdapter {
         console.log('🔌 Chrome Milvus adapter initialized');
     }
 
-    /**
-     * Create collection for the repository
-     */
     async createCollection(dimension: number = 1536): Promise<void> {
         if (!this.milvusDb) {
             throw new Error('Milvus not initialized');
@@ -80,9 +65,6 @@ export class ChromeMilvusAdapter {
         }
     }
 
-    /**
-     * Check if collection exists
-     */
     async collectionExists(): Promise<boolean> {
         if (!this.milvusDb) {
             return false;
@@ -96,9 +78,6 @@ export class ChromeMilvusAdapter {
         }
     }
 
-    /**
-     * Insert code chunks into Milvus
-     */
     async insertChunks(chunks: CodeChunk[]): Promise<void> {
         if (!this.milvusDb) {
             throw new Error('Milvus not initialized');
@@ -108,7 +87,6 @@ export class ChromeMilvusAdapter {
             return;
         }
 
-        // Convert to vector documents format
         const documents = chunks.map(chunk => ({
             id: chunk.id,
             vector: chunk.vector || [],
@@ -117,7 +95,7 @@ export class ChromeMilvusAdapter {
             startLine: chunk.startLine,
             endLine: chunk.endLine,
             fileExtension: chunk.fileExtension,
-            metadata: JSON.parse(chunk.metadata || '{}') // Parse metadata string to object
+            metadata: JSON.parse(chunk.metadata || '{}')
         }));
 
         try {
@@ -129,9 +107,6 @@ export class ChromeMilvusAdapter {
         }
     }
 
-    /**
-     * Search for similar code chunks
-     */
     async searchSimilar(queryVector: number[], limit: number = 10, threshold: number = 0.3): Promise<SearchResult[]> {
         if (!this.milvusDb) {
             throw new Error('Milvus not initialized');
@@ -145,7 +120,6 @@ export class ChromeMilvusAdapter {
 
             const results = await this.milvusDb.search(this.collectionName, queryVector, searchOptions);
 
-            // Convert results to our format and ensure they're sorted by score (descending)
             const searchResults = results.map(result => ({
                 id: result.document.id,
                 content: result.document.content,
@@ -153,11 +127,10 @@ export class ChromeMilvusAdapter {
                 startLine: result.document.startLine,
                 endLine: result.document.endLine,
                 fileExtension: result.document.fileExtension,
-                metadata: JSON.stringify(result.document.metadata), // Convert back to string
+                metadata: JSON.stringify(result.document.metadata),
                 score: result.score
             }));
 
-            // Additional sorting to ensure results are in descending order by score
             searchResults.sort((a, b) => b.score - a.score);
 
             console.log(`🔍 Found ${searchResults.length} results with cosine similarity scores:`, 
@@ -174,9 +147,6 @@ export class ChromeMilvusAdapter {
         }
     }
 
-    /**
-     * Clear all data in the collection
-     */
     async clearCollection(): Promise<void> {
         if (!this.milvusDb) {
             throw new Error('Milvus not initialized');
@@ -191,9 +161,6 @@ export class ChromeMilvusAdapter {
         }
     }
 
-    /**
-     * Get collection statistics
-     */
     async getCollectionStats(): Promise<{ totalEntities: number } | null> {
         if (!this.milvusDb) {
             return null;
@@ -210,12 +177,8 @@ export class ChromeMilvusAdapter {
         }
     }
 
-    /**
-     * Test connection to Milvus
-     */
     async testConnection(): Promise<boolean> {
         try {
-            // Get configuration
             const config = await MilvusConfigManager.getMilvusConfig();
             if (!config) {
                 console.error('No Milvus configuration found');
@@ -234,7 +197,6 @@ export class ChromeMilvusAdapter {
                 hasUsername: !!config.username
             });
 
-            // Try to create a temporary MilvusRestfulVectorDatabase instance
             const coreConfig = {
                 address: config.address,
                 token: config.token,
@@ -245,8 +207,6 @@ export class ChromeMilvusAdapter {
 
             const testDb = new MilvusRestfulVectorDatabase(coreConfig);
             
-            // Try to make a simple request to test connectivity
-            // We'll try to check if a collection exists as a basic connectivity test
             try {
                 await testDb.hasCollection('_test_connection_');
                 console.log('Milvus connection test successful');

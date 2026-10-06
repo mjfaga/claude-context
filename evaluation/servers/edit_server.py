@@ -1,13 +1,7 @@
 #!/usr/bin/env python3
-"""
-An edit server using MCP (Model Context Protocol).
-This server provides file editing functionality for modifying files.
-"""
-
 import os
 from mcp.server.fastmcp import FastMCP
 
-# Create the MCP server
 mcp = FastMCP("Edit Server")
 
 
@@ -29,10 +23,8 @@ def edit(file_path: str, old_string: str, new_string: str) -> str:
     Returns:
         A string indicating the file has been successfully modified.
     """
-    # Mock the edit operation
     return f"Successfully modified file: {file_path}"
 
 
 if __name__ == "__main__":
-    # Run the server with stdio transport
     mcp.run(transport="stdio")

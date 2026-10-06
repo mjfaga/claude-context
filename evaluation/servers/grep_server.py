@@ -1,24 +1,15 @@
 #!/usr/bin/env python3
-"""
-A grep server using MCP (Model Context Protocol).
-This server provides grep functionality to search for regular expression patterns within files.
-
-Implementation logic inspired by Gemini CLI's grep.ts:
-https://github.com/google-gemini/gemini-cli/blob/main/packages/core/src/tools/grep.ts
-Adapted from TypeScript to Python implementation with similar fallback strategy.
-"""
+"""Adapted from Gemini CLI grep.ts: https://github.com/google-gemini/gemini-cli/blob/main/packages/core/src/tools/grep.ts"""
 
 import os
 import subprocess
 from typing import Dict, Any, Optional
 from mcp.server.fastmcp import FastMCP
 
-# Create the MCP server
 mcp = FastMCP("Grep Server")
 
 
 def is_git_repository(path: str) -> bool:
-    """Check if the given path is inside a git repository."""
     try:
         result = subprocess.run(
             ["git", "rev-parse", "--git-dir"],
@@ -46,30 +37,23 @@ def search_text(
     Returns:
         A dictionary containing search results with file paths, line numbers, and matching lines.
     """
-    # Use current working directory if no path specified
     search_path = path if path else os.getcwd()
 
-    # Validate that the search path exists
     if not os.path.exists(search_path):
         return {"error": f"Path does not exist: {search_path}", "matches": []}
 
     try:
-        # Check if we're in a git repository and try git grep first
         if is_git_repository(search_path):
             try:
-                # Build git grep command
                 git_cmd = ["git", "grep", "-n", "-E"]
 
-                # Add include pattern if specified (git grep uses different syntax)
                 if include:
                     git_cmd.extend(["--", include])
                 else:
                     git_cmd.append("--")
 
-                # Add pattern
                 git_cmd.insert(-1, pattern)  # Insert pattern before the "--" separator
 
-                # Execute git grep command
                 result = subprocess.run(
                     git_cmd,
                     cwd=search_path,
@@ -80,14 +64,11 @@ def search_text(
                     timeout=30,
                 )
 
-                # If git grep succeeds, use its output
                 if result.returncode == 0:
-                    # Parse git grep output and return results
                     matches = []
                     if result.stdout:
                         for line in result.stdout.strip().split("\n"):
                             if ":" in line:
-                                # Parse git grep output format: filepath:line_number:content
                                 parts = line.split(":", 2)
                                 if len(parts) >= 3:
                                     file_path = parts[0]
@@ -123,22 +104,18 @@ def search_text(
                 subprocess.TimeoutExpired,
                 FileNotFoundError,
             ):
-                # Git grep failed, fall back to regular grep
                 pass
 
-        # Fallback: Build regular grep command
         cmd = [
             "grep",
             "-n",
             "-r",
             "-E",
-        ]  # -n for line numbers, -r for recursive, -E for extended regex
+        ]
 
-        # Add include pattern if specified
         if include:
             cmd.extend(["--include", include])
 
-        # Add common exclusions
         cmd.extend(
             [
                 "--exclude-dir=.git",
@@ -165,20 +142,16 @@ def search_text(
             ]
         )
 
-        # Add pattern and search path
         cmd.extend([pattern, search_path])
 
-        # Execute grep command
         result = subprocess.run(
             cmd, capture_output=True, text=True, encoding="utf-8", errors="ignore"
         )
 
-        # Parse grep output
         matches = []
         if result.stdout:
             for line in result.stdout.strip().split("\n"):
                 if ":" in line:
-                    # Parse grep output format: filepath:line_number:content
                     parts = line.split(":", 2)
                     if len(parts) >= 3:
                         file_path = parts[0]
@@ -190,11 +163,10 @@ def search_text(
                                     "file": file_path,
                                     "line_number": line_number,
                                     "line_content": line_content,
-                                    "match": pattern,  # grep already matched, so pattern is the match
+                                    "match": pattern,
                                 }
                             )
                         except ValueError:
-                            # Skip malformed lines
                             continue
 
         return {
@@ -202,7 +174,7 @@ def search_text(
             "search_path": search_path,
             "total_matches": len(matches),
             "matches": matches,
-            "command": " ".join(cmd),  # Include the actual command for debugging
+            "command": " ".join(cmd),
             "method": "system grep",
         }
 
@@ -213,5 +185,4 @@ def search_text(
 
 
 if __name__ == "__main__":
-    # Run the server with stdio transport
     mcp.run(transport="stdio")
