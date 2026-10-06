@@ -167,6 +167,7 @@ export class FileSynchronizer {
         if (!text || !pattern) return false;
 
         const regexPattern = pattern
+            // Escapes every regex metacharacter except *, which the next replace turns into .*.
             .replace(/[.+^${}()|[\]\\]/g, '\\$&')
             .replace(/\*/g, '.*');
 

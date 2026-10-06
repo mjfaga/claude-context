@@ -124,7 +124,7 @@ export class MilvusVectorDatabase implements VectorDatabase {
                 }
 
                 if (indexBuildProgress.status && indexBuildProgress.status.error_code !== 'Success') {
-                    // Older Milvus versions return a false error for sparse vector index progress; treat the index as ready.
+                    // Some Milvus versions report a false "index duplicates" error for sparse vector index progress; treat the index as ready.
                     if (indexBuildProgress.status.reason && indexBuildProgress.status.reason.includes('index duplicates[indexName=]')) {
                         console.log(`[MilvusDB] ⚠️  Index progress check returned known older Milvus issue: ${indexBuildProgress.status.reason}`);
                         console.log(`[MilvusDB] ⚠️  This is a known issue with older Milvus versions - treating as index ready`);

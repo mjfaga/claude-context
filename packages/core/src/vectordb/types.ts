@@ -67,6 +67,7 @@ export interface VectorDatabase {
 
     query(collectionName: string, filter: string, outputFields: string[], limit?: number): Promise<Record<string, any>[]>;
 
+    // Resolves true when a new collection can be created, false when the account limit is reached.
     checkCollectionLimit(): Promise<boolean>;
 }
 

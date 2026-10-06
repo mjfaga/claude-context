@@ -156,7 +156,7 @@ class MilvusVectorDB {
     }
 }
 
-// Chunking parameters match the VSCode extension
+// Chunking parameters match the VSCode extension's LangChain splitter defaults.
 function splitCode(content: string, language: string = '', chunkSize: number = 1000, chunkOverlap: number = 200): { content: string; startLine: number; endLine: number }[] {
     const lines = content.split('\n');
     const chunks: { content: string; startLine: number; endLine: number }[] = [];
@@ -436,7 +436,7 @@ async function handleIndexRepo(request: any, sendResponse: Function) {
         const vectorDB = new MilvusVectorDB(repoId);
         await vectorDB.initialize();
 
-        // Chunking values match the VSCode extension defaults
+        // Chunking values match the VSCode extension's LangChain splitter defaults.
         const chunkSize = 1000;
         const chunkOverlap = 200;
 

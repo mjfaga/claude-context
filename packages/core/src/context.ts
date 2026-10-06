@@ -884,6 +884,7 @@ export class Context {
 
     private simpleGlobMatch(text: string, pattern: string): boolean {
         const regexPattern = pattern
+            // Escapes every regex metacharacter except *, which the next replace turns into .*.
             .replace(/[.+^${}()|[\]\\]/g, '\\$&')
             .replace(/\*/g, '.*');
 

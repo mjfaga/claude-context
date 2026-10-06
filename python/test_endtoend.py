@@ -10,7 +10,6 @@ from ts_executor import TypeScriptExecutor
 
 
 def run_context_endtoend_test():
-
     config = {
         "openaiApiKey": os.environ.get("OPENAI_API_KEY", "your-openai-api-key"),
         "milvusAddress": os.environ.get("MILVUS_ADDRESS", "localhost:19530"),

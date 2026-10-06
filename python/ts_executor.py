@@ -9,12 +9,10 @@ from typing import Any, Dict, List, Optional
 
 
 class TypeScriptExecutor:
-
     def __init__(self, working_dir: Optional[str] = None):
         self.working_dir = working_dir or os.getcwd()
 
     def call_method(self, ts_file_path: str, method_name: str, *args, **kwargs) -> Any:
-
         if not os.path.isabs(ts_file_path):
             ts_file_path = os.path.join(self.working_dir, ts_file_path)
 

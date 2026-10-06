@@ -19,6 +19,7 @@ export class ToolHandlers {
     }
 
     private async syncIndexedCodebasesFromCloud(): Promise<void> {
+        // Cloud sync stays off: LanceDB metadata does not match the Zilliz format, so the sync deletes local-only indexes.
         console.log(`[SYNC-CLOUD] Skipped — using local LanceDB storage`);
         return;
         try {

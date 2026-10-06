@@ -330,7 +330,7 @@ export class LanceDBVectorDatabase implements VectorDatabase {
 
             const table = await this.db!.createTable(collectionName, sampleData, { mode: 'create' });
 
-            // The sample row stays until the FTS index exists.
+            // FTS index creation needs a row, so the sample row stays until the index exists.
             try {
                 console.log(`🔍 Creating FTS index for content field...`);
                 await table.createIndex("content", {

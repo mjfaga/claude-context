@@ -114,6 +114,7 @@ export class SnapshotManager {
     }
 
     public getIndexedCodebases(): string[] {
+        // Reads the snapshot file, not memory, for consistency; the in-memory state is the fallback when the read fails.
         try {
             if (!fs.existsSync(this.snapshotFilePath)) {
                 return [];
