@@ -1,8 +1,4 @@
 #!/usr/bin/env python3
-"""
-Analyze retrieval results and create MCP efficiency chart using real data.
-This script loads data from the actual result directories and generates seaborn charts.
-"""
 
 import json
 import os
@@ -14,25 +10,20 @@ from typing import Dict, List, Tuple
 
 
 def normalize_file_path(file_path: str) -> str:
-    """Normalize file paths."""
     if file_path.startswith("/"):
         file_path = file_path[1:]
     return file_path
 
 
 def calculate_metrics(hits: List[str], oracles: List[str]) -> Dict[str, float]:
-    """Calculate precision, recall, and F1-score."""
     if not hits and not oracles:
         return {"precision": 0.0, "recall": 0.0, "f1": 0.0}
 
-    # Normalize file paths
     hits_set = set(normalize_file_path(f) for f in hits)
     oracles_set = set(normalize_file_path(f) for f in oracles)
 
-    # Calculate intersection
     intersection = hits_set.intersection(oracles_set)
 
-    # Calculate metrics
     precision = len(intersection) / len(hits_set) if hits_set else 0.0
     recall = len(intersection) / len(oracles_set) if oracles_set else 0.0
     f1 = (
@@ -52,8 +43,6 @@ def calculate_metrics(hits: List[str], oracles: List[str]) -> Dict[str, float]:
 
 
 def load_method_results(method_dirs: List[str], method_name: str) -> Dict:
-    """Load and aggregate results from multiple runs of the same method."""
-
     all_f1_scores = []
     all_token_usage = []
     all_tool_calls = []
@@ -82,16 +71,13 @@ def load_method_results(method_dirs: List[str], method_name: str) -> Dict:
                     with open(result_file, "r") as f:
                         data = json.load(f)
 
-                    # Calculate F1-score
                     hits = data.get("hits", [])
                     oracles = data.get("oracles", [])
                     metrics = calculate_metrics(hits, oracles)
 
-                    # Extract other metrics
                     tokens = data.get("token_usage", {}).get("total_tokens", 0)
                     tools = data.get("tool_stats", {}).get("total_tool_calls", 0)
 
-                    # Store data
                     run_f1_scores.append(metrics["f1"])
                     run_tokens.append(tokens)
                     run_tools.append(tools)
@@ -105,12 +91,10 @@ def load_method_results(method_dirs: List[str], method_name: str) -> Dict:
 
         print(f"    Loaded {run_success_count} successful instances")
 
-        # Add this run's data to overall collection
         all_f1_scores.extend(run_f1_scores)
         all_token_usage.extend(run_tokens)
         all_tool_calls.extend(run_tools)
 
-    # Calculate aggregated statistics
     results = {
         "method_name": method_name,
         "total_runs": len(method_dirs),
@@ -134,13 +118,9 @@ def load_method_results(method_dirs: List[str], method_name: str) -> Dict:
 
 
 def create_efficiency_chart(both_results: Dict, grep_results: Dict):
-    """Create the efficiency comparison chart using Seaborn."""
-
-    # Set the aesthetic style
     sns.set_style("whitegrid")
     sns.set_palette("husl")
 
-    # Prepare data for plotting
     data = {
         "Method": [
             "With claude-context MCP",
@@ -150,7 +130,7 @@ def create_efficiency_chart(both_results: Dict, grep_results: Dict):
         ],
         "Metric": ["Token Usage", "Token Usage", "Tool Calls", "Tool Calls"],
         "Value": [
-            both_results["avg_tokens"] / 1000,  # Convert to thousands
+            both_results["avg_tokens"] / 1000,
             grep_results["avg_tokens"] / 1000,
             both_results["avg_tools"],
             grep_results["avg_tools"],
@@ -159,13 +139,10 @@ def create_efficiency_chart(both_results: Dict, grep_results: Dict):
 
     df = pd.DataFrame(data)
 
-    # Create figure with custom styling
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 7))
 
-    # Custom color palette
-    colors = ["#3498db", "#e74c3c"]  # Modern blue and red
+    colors = ["#3498db", "#e74c3c"]
 
-    # Token Usage subplot
     token_data = df[df["Metric"] == "Token Usage"]
     sns.barplot(
         data=token_data,
@@ -183,10 +160,8 @@ def create_efficiency_chart(both_results: Dict, grep_results: Dict):
     ax1.set_xlabel("")
     ax1.tick_params(axis="x", labelsize=12)
     ax1.tick_params(axis="y", labelsize=12)
-    # Set y-axis range with some padding
     ax1.set_ylim(0, max(token_data["Value"]) * 1.15)
 
-    # Add value labels for token usage
     token_values = [
         both_results["avg_tokens"] / 1000,
         grep_results["avg_tokens"] / 1000,
@@ -203,7 +178,6 @@ def create_efficiency_chart(both_results: Dict, grep_results: Dict):
             color=colors[i],
         )
 
-    # Add improvement annotation for tokens
     token_reduction = (
         (grep_results["avg_tokens"] - both_results["avg_tokens"])
         / grep_results["avg_tokens"]
@@ -228,7 +202,6 @@ def create_efficiency_chart(both_results: Dict, grep_results: Dict):
         color="white",
     )
 
-    # Tool Calls subplot
     tool_data = df[df["Metric"] == "Tool Calls"]
     sns.barplot(
         data=tool_data,
@@ -246,10 +219,8 @@ def create_efficiency_chart(both_results: Dict, grep_results: Dict):
     ax2.set_xlabel("")
     ax2.tick_params(axis="x", labelsize=12)
     ax2.tick_params(axis="y", labelsize=12)
-    # Set y-axis range with some padding
     ax2.set_ylim(0, max(tool_data["Value"]) * 1.15)
 
-    # Add value labels for tool calls
     tool_values = [both_results["avg_tools"], grep_results["avg_tools"]]
     for i, val in enumerate(tool_values):
         ax2.text(
@@ -263,7 +234,6 @@ def create_efficiency_chart(both_results: Dict, grep_results: Dict):
             color=colors[i],
         )
 
-    # Add improvement annotation for tool calls
     tool_reduction = (
         (grep_results["avg_tools"] - both_results["avg_tools"])
         / grep_results["avg_tools"]
@@ -288,15 +258,12 @@ def create_efficiency_chart(both_results: Dict, grep_results: Dict):
         color="white",
     )
 
-    # Keep x-axis labels horizontal and add grid
     for ax in [ax1, ax2]:
         ax.tick_params(axis="x", rotation=0)
         ax.grid(True, alpha=0.3)
 
-    # Adjust layout
     plt.tight_layout()
 
-    # Save with high quality
     output_file = "mcp_efficiency_analysis_chart.png"
     plt.savefig(
         output_file, dpi=300, bbox_inches="tight", facecolor="white", edgecolor="none"
@@ -305,7 +272,6 @@ def create_efficiency_chart(both_results: Dict, grep_results: Dict):
 
     print(f"\nChart saved as: {output_file}")
 
-    # Print summary
     print(f"\n{'='*80}")
     print(f"MCP EFFICIENCY ANALYSIS SUMMARY")
     print(f"{'='*80}")
@@ -342,12 +308,9 @@ def create_efficiency_chart(both_results: Dict, grep_results: Dict):
 
 
 def main():
-    """Main function to analyze and plot MCP efficiency."""
-
     print("MCP Efficiency Analysis - Loading Data")
     print("=" * 60)
 
-    # Define directories for each method
     both_dirs = [
         "retrieval_results_both",
         "retrieval_results_both2",
@@ -360,11 +323,9 @@ def main():
         "retrieval_results_grep3",
     ]
 
-    # Load and analyze results
     both_results = load_method_results(both_dirs, "Both (with claude-context MCP)")
     grep_results = load_method_results(grep_dirs, "Grep (baseline)")
 
-    # Create the efficiency chart
     create_efficiency_chart(both_results, grep_results)
 
 

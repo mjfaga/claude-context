@@ -9,9 +9,6 @@ export class IndexCommand {
         this.context = context;
     }
 
-    /**
-     * Update the Context instance (used when configuration changes)
-     */
     updateContext(context: Context): void {
         this.context = context;
     }
@@ -23,7 +20,6 @@ export class IndexCommand {
             return;
         }
 
-        // Let user select the folder to index (default is the first workspace folder)
         let selectedFolder = workspaceFolders[0];
 
         if (workspaceFolders.length > 1) {
@@ -63,30 +59,24 @@ export class IndexCommand {
             }, async (progress) => {
                 let lastPercentage = 0;
 
-                // Clear existing index first
                 await this.context.clearIndex(
                     selectedFolder.uri.fsPath,
                     (progressInfo) => {
-                        // Clear index progress is usually fast, just show the message
                         progress.report({ increment: 0, message: progressInfo.phase });
                     }
                 );
 
-                // Initialize file synchronizer
                 progress.report({ increment: 0, message: 'Initializing file synchronizer...' });
                 const { FileSynchronizer } = await import("@zilliz/claude-context-core");
                 const synchronizer = new FileSynchronizer(selectedFolder.uri.fsPath, this.context.getIgnorePatterns() || []);
                 await synchronizer.initialize();
-                // Store synchronizer in the context's internal map using the collection name from context
                 await this.context.getPreparedCollection(selectedFolder.uri.fsPath);
                 const collectionName = this.context.getCollectionName(selectedFolder.uri.fsPath);
                 this.context.setSynchronizer(collectionName, synchronizer);
 
-                // Start indexing with progress callback
                 indexStats = await this.context.indexCodebase(
                     selectedFolder.uri.fsPath,
                     (progressInfo) => {
-                        // Calculate increment from last reported percentage
                         const increment = progressInfo.percentage - lastPercentage;
                         lastPercentage = progressInfo.percentage;
 
@@ -115,7 +105,6 @@ export class IndexCommand {
             console.error('Indexing failed:', error);
             const errorString = typeof error === 'string' ? error : (error.message || error.toString() || '');
 
-            // Check for collection limit message from the core library
             if (errorString.includes('collection limit') || errorString.includes('zilliz.com/pricing')) {
                 const message = 'Your Zilliz Cloud account has hit its collection limit. To continue creating collections, you\'ll need to expand your capacity. We recommend visiting https://zilliz.com/pricing to explore options for dedicated or serverless clusters.';
                 const openButton = 'Explore Pricing Options';

@@ -10,16 +10,10 @@ export class SyncCommand {
         this.context = context;
     }
 
-    /**
-     * Update the Context instance (used when configuration changes)
-     */
     updateContext(context: Context): void {
         this.context = context;
     }
 
-    /**
-     * Sync the current workspace folder - check for changes and update index
-     */
     async execute(): Promise<void> {
         const workspaceFolders = vscode.workspace.workspaceFolders;
         if (!workspaceFolders || workspaceFolders.length === 0) {
@@ -32,11 +26,9 @@ export class SyncCommand {
             return;
         }
 
-        // Use the first workspace folder as target
         const targetFolder = workspaceFolders[0];
         const codebasePath = targetFolder.uri.fsPath;
 
-        // Check if the workspace folder exists
         if (!fs.existsSync(codebasePath)) {
             vscode.window.showErrorMessage(`Workspace folder '${codebasePath}' does not exist.`);
             return;
@@ -96,9 +88,6 @@ export class SyncCommand {
         }
     }
 
-    /**
-     * Auto-sync functionality - periodically check for changes
-     */
     async startAutoSync(intervalMinutes: number = 5): Promise<vscode.Disposable> {
         console.log(`[AUTO-SYNC] Starting auto-sync with ${intervalMinutes} minute interval`);
 
@@ -110,20 +99,15 @@ export class SyncCommand {
                 await this.executeSilent();
             } catch (error) {
                 console.warn('[AUTO-SYNC] Silent sync failed:', error);
-                // Don't show error to user for auto-sync failures
             }
         }, intervalMs);
 
-        // Return a disposable to stop the auto-sync
         return new vscode.Disposable(() => {
             console.log('[AUTO-SYNC] Stopping auto-sync');
             clearInterval(interval);
         });
     }
 
-    /**
-     * Silent sync - runs without progress notifications, used for auto-sync
-     */
     async executeSilent(): Promise<void> {
         const workspaceFolders = vscode.workspace.workspaceFolders;
         if (!workspaceFolders || workspaceFolders.length === 0) {
@@ -155,7 +139,6 @@ export class SyncCommand {
             if (totalChanges > 0) {
                 console.log(`[AUTO-SYNC] Silent sync complete for '${codebasePath}'. Added: ${syncStats.added}, Removed: ${syncStats.removed}, Modified: ${syncStats.modified}`);
 
-                // Show a subtle notification for auto-sync changes
                 vscode.window.showInformationMessage(
                     `🔄 Index auto-updated: ${totalChanges} file changes detected`,
                     { modal: false }
@@ -172,9 +155,6 @@ export class SyncCommand {
         }
     }
 
-    /**
-     * Check if sync is currently in progress
-     */
     getIsSyncing(): boolean {
         return this.isSyncing;
     }

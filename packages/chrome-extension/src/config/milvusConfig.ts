@@ -17,9 +17,6 @@ export interface ChromeStorageConfig {
 }
 
 export class MilvusConfigManager {
-    /**
-     * Get Milvus configuration from Chrome storage
-     */
     static async getMilvusConfig(): Promise<MilvusConfig | null> {
         return new Promise((resolve) => {
             chrome.storage.sync.get([
@@ -53,9 +50,6 @@ export class MilvusConfigManager {
         });
     }
 
-    /**
-     * Save Milvus configuration to Chrome storage
-     */
     static async saveMilvusConfig(config: MilvusConfig): Promise<void> {
         return new Promise((resolve, reject) => {
             chrome.storage.sync.set({
@@ -74,9 +68,6 @@ export class MilvusConfigManager {
         });
     }
 
-    /**
-     * Get OpenAI configuration
-     */
     static async getOpenAIConfig(): Promise<{ apiKey: string; model: string } | null> {
         return new Promise((resolve) => {
             chrome.storage.sync.get(['openaiToken'], (items: ChromeStorageConfig) => {
@@ -87,22 +78,18 @@ export class MilvusConfigManager {
 
                 resolve({
                     apiKey: items.openaiToken,
-                    model: 'text-embedding-3-small' // Default model
+                    model: 'text-embedding-3-small'
                 });
             });
         });
     }
 
-    /**
-     * Validate Milvus configuration
-     */
     static validateMilvusConfig(config: MilvusConfig): boolean {
         if (!config.address) {
             return false;
         }
 
-        // For basic validation, just check if address is provided
-        // Authentication can be optional for local instances
+        // Authentication is optional for local instances
         return true;
     }
 }

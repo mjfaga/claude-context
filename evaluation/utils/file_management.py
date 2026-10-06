@@ -11,16 +11,6 @@ logger = logging.getLogger(__name__)
 
 
 def get_remaining_instances(instances, output_file):
-    """
-    Filters a list of instances to exclude those that have already been processed and saved in a file.
-
-    Args:
-        instances (List[Dict]): A list of instances, where each instance is a dictionary with an "instance_id" key.
-        output_file (Path): The path to the file where the processed instances are saved.
-
-    Returns:
-        List[Dict]: A list of instances that have not been processed yet.
-    """
     instance_ids = set()
     remaining_instances = list()
     if output_file.exists():
@@ -60,26 +50,6 @@ def list_files(root_dir, include_tests=False):
 
 
 class ContextManager:
-    """
-    A context manager for managing a Git repository at a specific commit.
-
-    Args:
-        repo_path (str): The path to the Git repository.
-        base_commit (str): The commit hash to switch to.
-        verbose (bool, optional): Whether to print verbose output. Defaults to False.
-
-    Attributes:
-        repo_path (str): The path to the Git repository.
-        base_commit (str): The commit hash to switch to.
-        verbose (bool): Whether to print verbose output.
-        repo (git.Repo): The Git repository object.
-
-    Methods:
-        __enter__(): Switches to the specified commit and returns the context manager object.
-        get_readme_files(): Returns a list of filenames for all README files in the repository.
-        __exit__(exc_type, exc_val, exc_tb): Does nothing.
-    """
-
     def __init__(self, repo_path, base_commit, verbose=False):
         self.repo_path = Path(repo_path).resolve().as_posix()
         self.base_commit = base_commit
@@ -109,17 +79,6 @@ class ContextManager:
 
 
 def clone_repo(repo, root_dir, token):
-    """
-    Clones a GitHub repository to a specified directory.
-
-    Args:
-        repo (str): The GitHub repository to clone.
-        root_dir (str): The root directory to clone the repository to.
-        token (str): The GitHub personal access token to use for authentication.
-
-    Returns:
-        Path: The path to the cloned repository directory.
-    """
     repo_dir = Path(root_dir, f"repo__{repo.replace('/', '__')}")
 
     if not repo_dir.exists():

@@ -3,10 +3,6 @@ import { OpenAIEmbedding } from '../packages/core/src/embedding/openai-embedding
 import { MilvusVectorDatabase } from '../packages/core/src/vectordb/milvus-vectordb';
 import { AstCodeSplitter } from '../packages/core/src/splitter/ast-splitter';
 
-/**
- * Context End-to-End Test - Complete Workflow
- * Includes: Configure Embedding → Configure Vector Database → Create Context → Index Codebase → Semantic Search
- */
 export async function testContextEndToEnd(config: {
     openaiApiKey: string;
     milvusAddress: string;
@@ -16,20 +12,17 @@ export async function testContextEndToEnd(config: {
     try {
         console.log('🚀 Starting Context end-to-end test...');
 
-        // 1. Create embedding instance
         console.log('📝 Creating OpenAI embedding instance...');
         const embedding = new OpenAIEmbedding({
             apiKey: config.openaiApiKey,
             model: 'text-embedding-3-small'
         });
 
-        // 2. Create vector database instance
         console.log('🗄️ Creating Milvus vector database instance...');
         const vectorDB = new MilvusVectorDatabase({
             address: config.milvusAddress
         });
 
-        // 3. Create Context instance
         console.log('🔧 Creating Context instance...');
         const codeSplitter = new AstCodeSplitter(1000, 200);
         const context = new Context({
@@ -38,12 +31,10 @@ export async function testContextEndToEnd(config: {
             codeSplitter: codeSplitter
         });
 
-        // 4. Check if index already exists
         console.log('🔍 Checking existing index...');
         const hasIndex = await context.hasIndex(config.codebasePath);
         console.log(`Existing index status: ${hasIndex}`);
 
-        // 5. Index codebase
         let indexStats;
         if (!hasIndex) {
             console.log('📚 Starting codebase indexing...');
@@ -56,16 +47,14 @@ export async function testContextEndToEnd(config: {
             indexStats = { indexedFiles: 0, totalChunks: 0, message: "Using existing index" };
         }
 
-        // 6. Execute semantic search
         console.log('🔎 Executing semantic search...');
         const searchResults = await context.semanticSearch(
             config.codebasePath,
             config.searchQuery,
-            5, // topK
-            0.5 // threshold
+            5,
+            0.5
         );
 
-        // 7. Return complete results
         const result = {
             success: true,
             timestamp: new Date().toISOString(),

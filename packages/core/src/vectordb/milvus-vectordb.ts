@@ -28,7 +28,6 @@ export class MilvusVectorDatabase implements VectorDatabase {
     constructor(config: MilvusConfig) {
         this.config = config;
 
-        // Start initialization asynchronously without waiting
         this.initializationPromise = this.initialize();
     }
 
@@ -49,14 +48,9 @@ export class MilvusVectorDatabase implements VectorDatabase {
         });
     }
 
-    /**
-     * Resolve address from config or token
-     * Common logic for both gRPC and REST implementations
-     */
     protected async resolveAddress(): Promise<string> {
         let finalConfig = { ...this.config };
 
-        // If address is not provided, get it using token
         if (!finalConfig.address && finalConfig.token) {
             finalConfig.address = await ClusterManager.getAddressFromToken(finalConfig.token);
         }
@@ -68,9 +62,6 @@ export class MilvusVectorDatabase implements VectorDatabase {
         return finalConfig.address;
     }
 
-    /**
-     * Ensure initialization is complete before method execution
-     */
     protected async ensureInitialized(): Promise<void> {
         await this.initializationPromise;
         if (!this.client) {
@@ -78,16 +69,12 @@ export class MilvusVectorDatabase implements VectorDatabase {
         }
     }
 
-    /**
-     * Ensure collection is loaded before search/query operations
-     */
     protected async ensureLoaded(collectionName: string): Promise<void> {
         if (!this.client) {
             throw new Error('MilvusClient is not initialized. Call ensureInitialized() first.');
         }
 
         try {
-            // Check if collection is loaded
             const result = await this.client.getLoadState({
                 collection_name: collectionName
             });
@@ -104,16 +91,12 @@ export class MilvusVectorDatabase implements VectorDatabase {
         }
     }
 
-    /**
-     * Wait for an index to be ready before proceeding
-     * Polls index build progress with exponential backoff up to 60 seconds
-     */
     protected async waitForIndexReady(
         collectionName: string,
         fieldName: string,
-        maxWaitTime: number = 60000, // 60 seconds
-        initialInterval: number = 500, // 500ms
-        maxInterval: number = 5000, // 5 seconds
+        maxWaitTime: number = 60000,
+        initialInterval: number = 500,
+        maxInterval: number = 5000,
         backoffMultiplier: number = 1.5
     ): Promise<void> {
         if (!this.client) {
@@ -132,30 +115,26 @@ export class MilvusVectorDatabase implements VectorDatabase {
                     field_name: fieldName
                 });
 
-                // Debug logging to understand the progress
                 console.log(`[MilvusDB] 📊 Index build progress for '${fieldName}': indexed_rows=${indexBuildProgress.indexed_rows}, total_rows=${indexBuildProgress.total_rows}`);
                 console.log(`[MilvusDB] 📊 Full response:`, JSON.stringify(indexBuildProgress));
 
-                // Check if index building is complete
                 if (indexBuildProgress.indexed_rows === indexBuildProgress.total_rows) {
                     console.log(`[MilvusDB] ✅ Index on field '${fieldName}' is ready! (${indexBuildProgress.indexed_rows}/${indexBuildProgress.total_rows} rows indexed)`);
                     return;
                 }
 
-                // Check for error status
                 if (indexBuildProgress.status && indexBuildProgress.status.error_code !== 'Success') {
-                    // Handle known issue with older Milvus versions where sparse vector index progress returns incorrect error
+                    // Some Milvus versions report a false "index duplicates" error for sparse vector index progress; treat the index as ready.
                     if (indexBuildProgress.status.reason && indexBuildProgress.status.reason.includes('index duplicates[indexName=]')) {
                         console.log(`[MilvusDB] ⚠️  Index progress check returned known older Milvus issue: ${indexBuildProgress.status.reason}`);
                         console.log(`[MilvusDB] ⚠️  This is a known issue with older Milvus versions - treating as index ready`);
-                        return; // Treat as ready since this is a false error
+                        return;
                     }
                     throw new Error(`Index creation failed for field '${fieldName}' in collection '${collectionName}': ${indexBuildProgress.status.reason}`);
                 }
 
                 console.log(`[MilvusDB] 📊 Index building in progress: ${indexBuildProgress.indexed_rows}/${indexBuildProgress.total_rows} rows indexed`);
 
-                // Wait with exponential backoff
                 await new Promise(resolve => setTimeout(resolve, interval));
                 interval = Math.min(interval * backoffMultiplier, maxInterval);
 
@@ -168,14 +147,10 @@ export class MilvusVectorDatabase implements VectorDatabase {
         throw new Error(`Timeout waiting for index on field '${fieldName}' in collection '${collectionName}' to be ready after ${maxWaitTime}ms`);
     }
 
-    /**
-     * Load collection with retry logic and exponential backoff
-     * Retries up to 5 times with exponential backoff
-     */
     protected async loadCollectionWithRetry(
         collectionName: string,
         maxRetries: number = 5,
-        initialInterval: number = 1000, // 1 second
+        initialInterval: number = 1000,
         backoffMultiplier: number = 2
     ): Promise<void> {
         if (!this.client) {
@@ -203,7 +178,6 @@ export class MilvusVectorDatabase implements VectorDatabase {
                     throw new Error(`Failed to load collection '${collectionName}' after ${maxRetries} attempts: ${error}`);
                 }
 
-                // Wait with exponential backoff before retry
                 console.log(`[MilvusDB] ⏳ Retrying collection load in ${interval}ms...`);
                 await new Promise(resolve => setTimeout(resolve, interval));
                 interval *= backoffMultiplier;
@@ -279,7 +253,6 @@ export class MilvusVectorDatabase implements VectorDatabase {
 
         await this.client.createCollection(createCollectionParams);
 
-        // Create index
         const indexParams = {
             collection_name: collectionName,
             field_name: 'vector',
@@ -291,13 +264,10 @@ export class MilvusVectorDatabase implements VectorDatabase {
         console.log(`[MilvusDB] 🔧 Creating index for field 'vector' in collection '${collectionName}'...`);
         await this.client.createIndex(indexParams);
 
-        // Wait for index to be ready before loading collection
         await this.waitForIndexReady(collectionName, 'vector');
 
-        // Load collection to memory with retry logic
         await this.loadCollectionWithRetry(collectionName);
 
-        // Verify collection is created correctly
         await this.client.describeCollection({
             collection_name: collectionName,
         });
@@ -337,7 +307,6 @@ export class MilvusVectorDatabase implements VectorDatabase {
         }
 
         const result = await this.client.showCollections();
-        // Handle the response format - cast to any to avoid type errors
         const collections = (result as any).collection_names || (result as any).collections || [];
         return Array.isArray(collections) ? collections : [];
     }
@@ -383,7 +352,6 @@ export class MilvusVectorDatabase implements VectorDatabase {
             output_fields: ['id', 'content', 'relativePath', 'startLine', 'endLine', 'fileExtension', 'metadata'],
         };
 
-        // Apply boolean expression filter if provided (e.g., fileExtension in [".ts",".py"]) 
         if (options?.filterExpr && options.filterExpr.trim().length > 0) {
             searchParams.expr = options.filterExpr;
         }
@@ -438,12 +406,11 @@ export class MilvusVectorDatabase implements VectorDatabase {
                 output_fields: outputFields,
             };
 
-            // Add limit if provided, or default for empty filter expressions
             if (limit !== undefined) {
                 queryParams.limit = limit;
             } else if (filter === '' || filter.trim() === '') {
-                // Milvus requires limit when using empty expressions
-                queryParams.limit = 16384; // Default limit for empty filters
+                // Milvus requires a limit when the filter expression is empty.
+                queryParams.limit = 16384;
             }
 
             const result = await this.client.query(queryParams);
@@ -521,7 +488,6 @@ export class MilvusVectorDatabase implements VectorDatabase {
             },
         ];
 
-        // Add BM25 function
         const functions = [
             {
                 name: "content_bm25_emb",
@@ -546,8 +512,6 @@ export class MilvusVectorDatabase implements VectorDatabase {
 
         await this.client.createCollection(createCollectionParams);
 
-        // Create indexes for both vector fields
-        // Index for dense vector
         const denseIndexParams = {
             collection_name: collectionName,
             field_name: 'vector',
@@ -558,10 +522,8 @@ export class MilvusVectorDatabase implements VectorDatabase {
         console.log(`[MilvusDB] 🔧 Creating dense vector index for field 'vector' in collection '${collectionName}'...`);
         await this.client.createIndex(denseIndexParams);
 
-        // Wait for dense vector index to be ready
         await this.waitForIndexReady(collectionName, 'vector');
 
-        // Index for sparse vector
         const sparseIndexParams = {
             collection_name: collectionName,
             field_name: 'sparse_vector',
@@ -573,13 +535,10 @@ export class MilvusVectorDatabase implements VectorDatabase {
 
         await this.client.createIndex(sparseIndexParams);
 
-        // Wait for sparse vector index to be ready
         await this.waitForIndexReady(collectionName, 'sparse_vector');
 
-        // Load collection to memory with retry logic
         await this.loadCollectionWithRetry(collectionName);
 
-        // Verify collection is created correctly
         await this.client.describeCollection({
             collection_name: collectionName,
         });
@@ -619,25 +578,22 @@ export class MilvusVectorDatabase implements VectorDatabase {
         }
 
         try {
-            // Generate OpenAI embedding for the first search request (dense)
             console.log(`[MilvusDB] 🔍 Preparing hybrid search for collection: ${collectionName}`);
 
-            // Prepare search requests in the correct Milvus format
             const search_param_1 = {
                 data: Array.isArray(searchRequests[0].data) ? searchRequests[0].data : [searchRequests[0].data],
-                anns_field: searchRequests[0].anns_field, // "vector"
-                param: searchRequests[0].param, // {"nprobe": 10}
+                anns_field: searchRequests[0].anns_field,
+                param: searchRequests[0].param,
                 limit: searchRequests[0].limit
             };
 
             const search_param_2 = {
-                data: searchRequests[1].data, // query text for sparse search
-                anns_field: searchRequests[1].anns_field, // "sparse_vector"
-                param: searchRequests[1].param, // {"drop_ratio_search": 0.2}
+                data: searchRequests[1].data,
+                anns_field: searchRequests[1].anns_field,
+                param: searchRequests[1].param,
                 limit: searchRequests[1].limit
             };
 
-            // Set rerank strategy to RRF (100) by default
             const rerank_strategy = {
                 strategy: "rrf",
                 params: {
@@ -659,7 +615,6 @@ export class MilvusVectorDatabase implements VectorDatabase {
             }, null, 2));
             console.log(`[MilvusDB] 🔍 Rerank strategy:`, JSON.stringify(rerank_strategy, null, 2));
 
-            // Execute hybrid search using the correct client.search format
             const searchParams: any = {
                 collection_name: collectionName,
                 data: [search_param_1, search_param_2],
@@ -692,7 +647,6 @@ export class MilvusVectorDatabase implements VectorDatabase {
 
             console.log(`[MilvusDB] ✅ Found ${searchResult.results.length} results from hybrid search`);
 
-            // Transform results to HybridSearchResult format
             return searchResult.results.map((result: any) => ({
                 document: {
                     id: result.id,
@@ -714,10 +668,6 @@ export class MilvusVectorDatabase implements VectorDatabase {
         }
     }
 
-    /**
-     * Wrapper method to handle collection creation with limit detection for gRPC client
-     * Returns true if collection can be created, false if limit exceeded
-     */
     async checkCollectionLimit(): Promise<boolean> {
         if (!this.client) {
             throw new Error('MilvusClient is not initialized. Call ensureInitialized() first.');
@@ -744,7 +694,6 @@ export class MilvusVectorDatabase implements VectorDatabase {
 
         try {
             await this.client.createCollection(createCollectionParams);
-            // Immediately drop the collection after successful creation
             if (await this.client.hasCollection({ collection_name: collectionName })) {
                 await this.client.dropCollection({
                     collection_name: collectionName,
@@ -752,13 +701,10 @@ export class MilvusVectorDatabase implements VectorDatabase {
             }
             return true;
         } catch (error: any) {
-            // Check if the error message contains the collection limit exceeded pattern
             const errorMessage = error.message || error.toString() || '';
             if (/exceeded the limit number of collections/i.test(errorMessage)) {
-                // Return false for collection limit exceeded
                 return false;
             }
-            // Re-throw other errors as-is
             throw error;
         }
     }

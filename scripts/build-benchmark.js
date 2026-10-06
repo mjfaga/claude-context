@@ -1,10 +1,5 @@
 #!/usr/bin/env node
 
-/**
- * Build performance benchmarking script
- * Measures and reports build times for all packages
- */
-
 const { execSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
@@ -50,7 +45,6 @@ function saveBenchmark(results) {
     
     history.push(benchmark);
     
-    // Keep only last 10 benchmarks
     if (history.length > 10) {
         history = history.slice(-10);
     }
@@ -64,15 +58,12 @@ function main() {
     
     const results = [];
     
-    // Clean first
     results.push(measureBuildTime('pnpm clean', 'Clean all packages'));
     
-    // Build individual packages
     results.push(measureBuildTime('pnpm build:core', 'Build core package'));
     results.push(measureBuildTime('pnpm build:mcp', 'Build MCP package'));
     results.push(measureBuildTime('pnpm build:vscode', 'Build VSCode extension'));
     
-    // Full build
     results.push(measureBuildTime('pnpm -r --filter="./packages/chrome-extension" build', 'Build Chrome extension'));
     
     const totalTime = results.reduce((sum, result) => sum + result.duration, 0);

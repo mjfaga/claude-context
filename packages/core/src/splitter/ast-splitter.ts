@@ -1,7 +1,6 @@
 import Parser from 'tree-sitter';
 import { Splitter, CodeChunk } from './index';
 
-// Language parsers
 const JavaScript = require('tree-sitter-javascript');
 const TypeScript = require('tree-sitter-typescript').typescript;
 const Python = require('tree-sitter-python');
@@ -12,7 +11,6 @@ const Rust = require('tree-sitter-rust');
 const CSharp = require('tree-sitter-c-sharp');
 const Scala = require('tree-sitter-scala');
 
-// Node types that represent logical code units
 const SPLITTABLE_NODE_TYPES = {
     javascript: ['function_declaration', 'arrow_function', 'class_declaration', 'method_definition', 'export_statement'],
     typescript: ['function_declaration', 'arrow_function', 'class_declaration', 'method_definition', 'export_statement', 'interface_declaration', 'type_alias_declaration'],
@@ -29,20 +27,18 @@ export class AstCodeSplitter implements Splitter {
     private chunkSize: number = 2500;
     private chunkOverlap: number = 300;
     private parser: Parser;
-    private langchainFallback: any; // LangChainCodeSplitter for fallback
+    private langchainFallback: any;
 
     constructor(chunkSize?: number, chunkOverlap?: number) {
         if (chunkSize) this.chunkSize = chunkSize;
         if (chunkOverlap) this.chunkOverlap = chunkOverlap;
         this.parser = new Parser();
 
-        // Initialize fallback splitter
         const { LangChainCodeSplitter } = require('./langchain-splitter');
         this.langchainFallback = new LangChainCodeSplitter(chunkSize, chunkOverlap);
     }
 
     async split(code: string, language: string, filePath?: string): Promise<CodeChunk[]> {
-        // Check if language is supported by AST splitter
         const langConfig = this.getLanguageConfig(language);
         if (!langConfig) {
             console.log(`📝 Language ${language} not supported by AST, using LangChain splitter for: ${filePath || 'unknown'}`);
@@ -60,10 +56,8 @@ export class AstCodeSplitter implements Splitter {
                 return await this.langchainFallback.split(code, language, filePath);
             }
 
-            // Extract chunks based on AST nodes
             const chunks = this.extractChunks(tree.rootNode, code, langConfig.nodeTypes, language, filePath);
 
-            // If chunks are too large, split them further
             const refinedChunks = await this.refineChunks(chunks, code);
 
             return refinedChunks;
@@ -117,13 +111,11 @@ export class AstCodeSplitter implements Splitter {
         const codeLines = code.split('\n');
 
         const traverse = (currentNode: Parser.SyntaxNode) => {
-            // Check if this node type should be split into a chunk
             if (splittableTypes.includes(currentNode.type)) {
                 const startLine = currentNode.startPosition.row + 1;
                 const endLine = currentNode.endPosition.row + 1;
                 const nodeText = code.slice(currentNode.startIndex, currentNode.endIndex);
 
-                // Only create chunk if it has meaningful content
                 if (nodeText.trim().length > 0) {
                     chunks.push({
                         content: nodeText,
@@ -137,7 +129,6 @@ export class AstCodeSplitter implements Splitter {
                 }
             }
 
-            // Continue traversing child nodes
             for (const child of currentNode.children) {
                 traverse(child);
             }
@@ -145,7 +136,6 @@ export class AstCodeSplitter implements Splitter {
 
         traverse(node);
 
-        // If no meaningful chunks found, create a single chunk with the entire code
         if (chunks.length === 0) {
             chunks.push({
                 content: code,
@@ -168,7 +158,6 @@ export class AstCodeSplitter implements Splitter {
             if (chunk.content.length <= this.chunkSize) {
                 refinedChunks.push(chunk);
             } else {
-                // Split large chunks using character-based splitting
                 const subChunks = this.splitLargeChunk(chunk, originalCode);
                 refinedChunks.push(...subChunks);
             }
@@ -189,7 +178,6 @@ export class AstCodeSplitter implements Splitter {
             const lineWithNewline = i === lines.length - 1 ? line : line + '\n';
 
             if (currentChunk.length + lineWithNewline.length > this.chunkSize && currentChunk.length > 0) {
-                // Create a sub-chunk
                 subChunks.push({
                     content: currentChunk.trim(),
                     metadata: {
@@ -209,7 +197,6 @@ export class AstCodeSplitter implements Splitter {
             }
         }
 
-        // Add the last sub-chunk
         if (currentChunk.trim().length > 0) {
             subChunks.push({
                 content: currentChunk.trim(),
@@ -236,7 +223,6 @@ export class AstCodeSplitter implements Splitter {
             let content = chunks[i].content;
             const metadata = { ...chunks[i].metadata };
 
-            // Add overlap from previous chunk
             if (i > 0 && this.chunkOverlap > 0) {
                 const prevChunk = chunks[i - 1];
                 const overlapText = prevChunk.content.slice(-this.chunkOverlap);
@@ -257,9 +243,6 @@ export class AstCodeSplitter implements Splitter {
         return text.split('\n').length;
     }
 
-    /**
-     * Check if AST splitting is supported for the given language
-     */
     static isLanguageSupported(language: string): boolean {
         const supportedLanguages = [
             'javascript', 'js', 'typescript', 'ts', 'python', 'py',

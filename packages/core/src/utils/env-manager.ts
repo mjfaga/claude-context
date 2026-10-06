@@ -10,17 +10,11 @@ export class EnvManager {
         this.envFilePath = path.join(homeDir, '.context', '.env');
     }
 
-    /**
-     * Get environment variable by name
-     * Priority: process.env > .env file > undefined
-     */
     get(name: string): string | undefined {
-        // First try to get from process environment variables
         if (process.env[name]) {
             return process.env[name];
         }
 
-        // If not found in process env, try to read from .env file
         try {
             if (fs.existsSync(this.envFilePath)) {
                 const content = fs.readFileSync(this.envFilePath, 'utf-8');
@@ -40,12 +34,8 @@ export class EnvManager {
         return undefined;
     }
 
-    /**
-     * Set environment variable to the .env file
-     */
     set(name: string, value: string): void {
         try {
-            // Ensure directory exists
             const envDir = path.dirname(this.envFilePath);
             if (!fs.existsSync(envDir)) {
                 fs.mkdirSync(envDir, { recursive: true });
@@ -54,15 +44,12 @@ export class EnvManager {
             let content = '';
             let found = false;
 
-            // Read existing content if file exists
             if (fs.existsSync(this.envFilePath)) {
                 content = fs.readFileSync(this.envFilePath, 'utf-8');
 
-                // Update existing variable
                 const lines = content.split('\n');
                 for (let i = 0; i < lines.length; i++) {
                     if (lines[i].trim().startsWith(`${name}=`)) {
-                        // Replace the existing value
                         lines[i] = `${name}=${value}`;
                         found = true;
                         console.log(`[EnvManager] ✅ Updated ${name} in ${this.envFilePath}`);
@@ -72,7 +59,6 @@ export class EnvManager {
                 content = lines.join('\n');
             }
 
-            // If variable not found, append it
             if (!found) {
                 if (content && !content.endsWith('\n')) {
                     content += '\n';
@@ -89,13 +75,9 @@ export class EnvManager {
         }
     }
 
-    /**
-     * Get the path to the .env file
-     */
     getEnvFilePath(): string {
         return this.envFilePath;
     }
 }
 
-// Export a default instance for convenience
 export const envManager = new EnvManager(); 

@@ -2,11 +2,10 @@ import { Context, MilvusVectorDatabase, MilvusRestfulVectorDatabase, AstCodeSpli
 import { envManager } from '@zilliz/claude-context-core';
 import * as path from 'path';
 
-// Try to load .env file
 try {
     require('dotenv').config();
 } catch (error) {
-    // dotenv is not required, skip if not installed
+    // dotenv is optional
 }
 
 async function main() {
@@ -14,9 +13,6 @@ async function main() {
     console.log('===============================');
 
     try {
-        // 1. Choose Vector Database implementation
-        // Set to true to use RESTful API (for environments without gRPC support)
-        // Set to false to use gRPC (default, more efficient)
         const useRestfulApi = false;
         const milvusAddress = envManager.get('MILVUS_ADDRESS') || 'localhost:19530';
         const milvusToken = envManager.get('MILVUS_TOKEN');
@@ -27,20 +23,17 @@ async function main() {
 
         let vectorDatabase;
         if (useRestfulApi) {
-            // Use RESTful implementation (for environments without gRPC support)
             vectorDatabase = new MilvusRestfulVectorDatabase({
                 address: milvusAddress,
                 ...(milvusToken && { token: milvusToken })
             });
         } else {
-            // Use gRPC implementation (default, more efficient)
             vectorDatabase = new MilvusVectorDatabase({
                 address: milvusAddress,
                 ...(milvusToken && { token: milvusToken })
             });
         }
 
-        // 2. Create Context instance
         let codeSplitter;
         if (splitterType === 'langchain') {
             codeSplitter = new LangChainCodeSplitter(1000, 200);
@@ -53,24 +46,19 @@ async function main() {
             supportedExtensions: ['.ts', '.js', '.py', '.java', '.cpp', '.go', '.rs']
         });
 
-        // 3. Check if index already exists and clear if needed
         console.log('\n📖 Starting to index codebase...');
-        const codebasePath = path.join(__dirname, '../..'); // Index entire project
+        const codebasePath = path.join(__dirname, '../..');
 
-        // Check if index already exists
         const hasExistingIndex = await context.hasIndex(codebasePath);
         if (hasExistingIndex) {
             console.log('🗑️  Existing index found, clearing it first...');
             await context.clearIndex(codebasePath);
         }
 
-        // Index with progress tracking
         const indexStats = await context.indexCodebase(codebasePath);
 
-        // 4. Show indexing statistics
         console.log(`\n📊 Indexing stats: ${indexStats.indexedFiles} files, ${indexStats.totalChunks} code chunks`);
 
-        // 5. Perform semantic search
         console.log('\n🔍 Performing semantic search...');
 
         const queries = [
@@ -102,7 +90,6 @@ async function main() {
     } catch (error) {
         console.error('❌ Error occurred:', error);
 
-        // Provide detailed error diagnostics
         if (error instanceof Error) {
             if (error.message.includes('API key')) {
                 console.log('\n💡 Please make sure to set the correct OPENAI_API_KEY environment variable');
@@ -128,7 +115,6 @@ async function main() {
     }
 }
 
-// Run main program
 if (require.main === module) {
     main().catch(console.error);
 }

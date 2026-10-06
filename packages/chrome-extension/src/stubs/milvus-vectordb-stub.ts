@@ -1,7 +1,3 @@
-// Simplified types and implementation for Chrome extension environment
-// This file provides the necessary types and a lightweight Milvus RESTful implementation
-// that can work in Chrome extension context without node-specific dependencies
-
 export interface VectorDocument {
     id: string;
     vector: number[];
@@ -32,10 +28,6 @@ export interface MilvusRestfulConfig {
     database?: string;
 }
 
-/**
- * Simplified Milvus Vector Database implementation for Chrome Extension
- * Based on the core implementation but adapted for browser environment
- */
 export class MilvusRestfulVectorDatabase {
     private config: MilvusRestfulConfig;
     private baseUrl: string;
@@ -43,7 +35,6 @@ export class MilvusRestfulVectorDatabase {
     constructor(config: MilvusRestfulConfig) {
         this.config = config;
 
-        // Ensure address has protocol prefix
         let address = config.address;
         if (!address.startsWith('http://') && !address.startsWith('https://')) {
             address = `http://${address}`;
@@ -53,9 +44,6 @@ export class MilvusRestfulVectorDatabase {
         console.log(`🔌 Connecting to Milvus REST API at: ${address}`);
     }
 
-    /**
-     * Make HTTP request to Milvus REST API
-     */
     private async makeRequest(endpoint: string, method: 'GET' | 'POST' = 'POST', data?: any): Promise<any> {
         const url = `${this.baseUrl}${endpoint}`;
 
@@ -64,7 +52,6 @@ export class MilvusRestfulVectorDatabase {
             'Accept': 'application/json'
         };
 
-        // Handle authentication
         if (this.config.token) {
             headers['Authorization'] = `Bearer ${this.config.token}`;
         } else if (this.config.username && this.config.password) {
@@ -102,7 +89,6 @@ export class MilvusRestfulVectorDatabase {
         } catch (error) {
             console.error(`❌ Milvus REST API request failed to ${url}:`, error);
 
-            // Enhance error messages for common issues
             if (error instanceof TypeError && error.message.includes('fetch')) {
                 throw new Error(`Network error: Unable to connect to Milvus server at ${this.config.address}. Please check the server address and ensure it's running.`);
             }
@@ -174,13 +160,10 @@ export class MilvusRestfulVectorDatabase {
                 }
             };
 
-            // Create collection with limit check
             await createCollectionWithLimitCheck(this.makeRequest.bind(this), collectionSchema);
 
-            // Create index
             await this.createIndex(collectionName);
 
-            // Load collection
             await this.loadCollection(collectionName);
 
         } catch (error) {
@@ -314,20 +297,14 @@ export class MilvusRestfulVectorDatabase {
                         fileExtension: item.fileExtension || '',
                         metadata: metadata
                     },
-                    // For cosine similarity, Milvus returns distance values
-                    // We need to convert distance to similarity score
-                    // Cosine distance = 1 - cosine similarity
-                    // So cosine similarity = 1 - distance
                     score: Math.max(0, Math.min(1, 1 - (item.distance || 1)))
                 };
             });
 
-            // Filter by threshold if provided
             const filteredResults = options?.threshold !== undefined
                 ? results.filter(result => result.score >= options.threshold!)
                 : results;
 
-            // Sort by score in descending order (highest similarity first)
             const sortedResults = filteredResults.sort((a, b) => b.score - a.score);
 
             return sortedResults;
@@ -356,7 +333,6 @@ export class MilvusRestfulVectorDatabase {
         }
     }
 
-    // Additional helper methods for stats
     async getCollectionStats(collectionName: string): Promise<{ entityCount: number }> {
         try {
             const response = await this.makeRequest('/collections/describe', 'POST', {
@@ -364,7 +340,7 @@ export class MilvusRestfulVectorDatabase {
                 dbName: this.config.database
             });
 
-            // Extract entity count from response (may vary based on Milvus version)
+            // The entity count field name varies by Milvus version.
             const entityCount = response.data?.numEntities || response.data?.entityCount || 0;
 
             return { entityCount };
@@ -375,16 +351,8 @@ export class MilvusRestfulVectorDatabase {
     }
 }
 
-/**
- * Special error type for collection limit exceeded
- * This allows us to distinguish it from other errors
- */
 export const COLLECTION_LIMIT_MESSAGE = "[Error]: Your Zilliz Cloud account has hit its collection limit. To continue creating collections, you'll need to expand your capacity. We recommend visiting https://zilliz.com/pricing to explore options for dedicated or serverless clusters.";
 
-/**
- * Wrapper function to handle collection creation with limit detection
- * This is the single point where collection limit errors are detected and handled
- */
 async function createCollectionWithLimitCheck(
     makeRequestFn: (endpoint: string, method: 'GET' | 'POST', data?: any) => Promise<any>,
     collectionSchema: any
@@ -392,14 +360,12 @@ async function createCollectionWithLimitCheck(
     try {
         await makeRequestFn('/collections/create', 'POST', collectionSchema);
     } catch (error: any) {
-        // Check if the error message contains the collection limit exceeded pattern
         const errorMessage = error.message || error.toString() || '';
         console.error(`❌ Error creating collection:`, errorMessage);
         if (/exceeded the limit number of collections/i.test(errorMessage)) {
-            // Throw the exact message string, not an Error object
+            // Throws the message string itself, not an Error object.
             throw COLLECTION_LIMIT_MESSAGE;
         }
-        // Re-throw other errors as-is
         throw error;
     }
 }

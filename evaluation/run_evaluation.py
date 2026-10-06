@@ -21,19 +21,6 @@ def main(
     root_dir: str = str(evaluation_path / "repos"),
     max_instances: Optional[int] = 5,
 ):
-    """
-    Main function to run custom retrieval.
-    
-    Args:
-        dataset_name_or_path: Dataset path or name
-        output_dir: Output directory for results
-        retrieval_types: List of retrieval types to use ('cc', 'grep', or both)
-        llm_type: Type of LLM to use
-        llm_model: LLM model name
-        splits: Dataset splits to process
-        root_dir: Root directory for repositories
-        max_instances: Maximum number of instances to process
-    """
     logger.info(f"Starting custom retrieval with types: {retrieval_types}")
 
     retrieval = CustomRetrieval(
@@ -50,7 +37,6 @@ def main(
 
 
 def parse_retrieval_types(value: str) -> List[str]:
-    """Parse comma-separated retrieval types string into list"""
     types = [t.strip().lower() for t in value.split(",")]
     valid_types = {"cc", "grep"}
 
@@ -70,7 +56,6 @@ if __name__ == "__main__":
     parser.add_argument(
         "--dataset_name_or_path",
         type=str,
-        # default="SWE-bench/SWE-bench_Lite",
         default="swe_verified_15min1h_2files_instances.json",
         help="Dataset name or path",
     )
@@ -90,17 +75,13 @@ if __name__ == "__main__":
         "--llm_type",
         type=str,
         choices=["openai", "ollama", "moonshot"],
-        # default="moonshot",
         default="openai",
-        # default="anthropic",
         help="LLM type",
     )
     parser.add_argument(
         "--llm_model",
         type=str,
-        # default="kimi-k2-0711-preview",
         default="gpt-4o-mini",
-        # default="claude-sonnet-4-20250514",
         help="LLM model name, e.g. gpt-4o-mini",
     )
     parser.add_argument(

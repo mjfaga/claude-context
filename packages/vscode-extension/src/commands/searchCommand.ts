@@ -9,9 +9,6 @@ export class SearchCommand {
         this.context = context;
     }
 
-    /**
-     * Update the Context instance (used when configuration changes)
-     */
     updateContext(context: Context): void {
         this.context = context;
     }
@@ -19,13 +16,10 @@ export class SearchCommand {
     async execute(preSelectedText?: string): Promise<void> {
         let searchTerm: string | undefined;
 
-        // Check if we have meaningful pre-selected text
         const trimmedPreSelectedText = preSelectedText?.trim();
         if (trimmedPreSelectedText && trimmedPreSelectedText.length > 0) {
-            // Use the pre-selected text directly
             searchTerm = trimmedPreSelectedText;
         } else {
-            // Show input box if no meaningful pre-selected text
             searchTerm = await vscode.window.showInputBox({
                 placeHolder: 'Enter search term...',
                 prompt: 'Search for functions, classes, variables, or any code using semantic search'
@@ -44,7 +38,6 @@ export class SearchCommand {
             }, async (progress) => {
                 progress.report({ increment: 0, message: 'Performing semantic search...' });
 
-                // Get workspace root for codebase path
                 const workspaceFolders = vscode.workspace.workspaceFolders;
                 if (!workspaceFolders || workspaceFolders.length === 0) {
                     vscode.window.showErrorMessage('No workspace folder found. Please open a folder first.');
@@ -52,7 +45,6 @@ export class SearchCommand {
                 }
                 const codebasePath = workspaceFolders[0].uri.fsPath;
 
-                // Check if index exists
                 progress.report({ increment: 20, message: 'Checking index...' });
                 const hasIndex = await this.context.hasIndex(codebasePath);
 
@@ -61,7 +53,6 @@ export class SearchCommand {
                     return;
                 }
 
-                // Optionally prompt for file extension filters
                 const extensionInput = await vscode.window.showInputBox({
                     placeHolder: 'Optional: filter by file extensions (e.g. .ts,.py,.java) – leave empty for all',
                     prompt: 'Enter a comma-separated list of file extensions to include',
@@ -73,7 +64,6 @@ export class SearchCommand {
                     .map(e => e.trim())
                     .filter(Boolean);
 
-                // Validate extensions strictly and build filter expression
                 let filterExpr: string | undefined = undefined;
                 if (fileExtensions.length > 0) {
                     const invalid = fileExtensions.filter(e => !(e.startsWith('.') && e.length > 1 && !/\s/.test(e)));
@@ -86,7 +76,6 @@ export class SearchCommand {
                     filterExpr = `fileExtension in [${quoted}]`;
                 }
 
-                // Use semantic search
                 const query: SearchQuery = {
                     term: searchTerm,
                     includeContent: true,
@@ -100,10 +89,9 @@ export class SearchCommand {
                     codebasePath,
                     query.term,
                     query.limit || 20,
-                    0.3, // similarity threshold
+                    0.3,
                     filterExpr
                 );
-                // No client-side filtering; filter pushed down via filter expression
 
                 progress.report({ increment: 100, message: 'Search complete!' });
 
@@ -112,7 +100,6 @@ export class SearchCommand {
                     return;
                 }
 
-                // Generate quick pick items for VS Code
                 const quickPickItems = this.generateQuickPickItems(results, searchTerm, codebasePath);
 
                 const selected = await vscode.window.showQuickPick(quickPickItems, {
@@ -149,8 +136,7 @@ export class SearchCommand {
             const document = await vscode.workspace.openTextDocument(fullPath);
             const editor = await vscode.window.showTextDocument(document);
 
-            // Navigate to the location
-            const line = Math.max(0, result.startLine - 1); // Convert to 0-based line numbers
+            const line = Math.max(0, result.startLine - 1);
             const column = 0;
 
             const position = new vscode.Position(line, column);
@@ -163,18 +149,13 @@ export class SearchCommand {
         }
     }
 
-    /**
-     * Execute search for webview (without UI prompts)
-     */
     async executeForWebview(searchTerm: string, limit: number = 50, fileExtensions: string[] = []): Promise<SemanticSearchResult[]> {
-        // Get workspace root for codebase path
         const workspaceFolders = vscode.workspace.workspaceFolders;
         if (!workspaceFolders || workspaceFolders.length === 0) {
             throw new Error('No workspace folder found. Please open a folder first.');
         }
         const codebasePath = workspaceFolders[0].uri.fsPath;
 
-        // Check if index exists
         const hasIndex = await this.context.hasIndex(codebasePath);
         if (!hasIndex) {
             throw new Error('Index not found. Please index the codebase first.');
@@ -182,7 +163,6 @@ export class SearchCommand {
 
         console.log('🔍 Using semantic search for webview...');
 
-        // Validate extensions strictly and build filter expression
         let filterExpr: string | undefined = undefined;
         if (fileExtensions && fileExtensions.length > 0) {
             const invalid = fileExtensions.filter(e => !(typeof e === 'string' && e.startsWith('.') && e.length > 1 && !/\s/.test(e)));
@@ -197,15 +177,12 @@ export class SearchCommand {
             codebasePath,
             searchTerm,
             limit,
-            0.3, // similarity threshold
+            0.3,
             filterExpr
         );
         return results;
     }
 
-    /**
-     * Check if index exists for the given codebase path
-     */
     async hasIndex(codebasePath: string): Promise<boolean> {
         try {
             return await this.context.hasIndex(codebasePath);
@@ -215,18 +192,13 @@ export class SearchCommand {
         }
     }
 
-    /**
-     * Generate quick pick items for VS Code
-     */
     private generateQuickPickItems(results: SemanticSearchResult[], searchTerm: string, workspaceRoot?: string) {
         return results.slice(0, 20).map((result, index) => {
             let displayPath = result.relativePath;
-            // Truncate content for display
             const truncatedContent = result.content.length <= 150
                 ? result.content
                 : result.content.substring(0, 150) + '...';
 
-            // Add rank info to description
             const rankText = ` (rank: ${index + 1})`;
 
             return {

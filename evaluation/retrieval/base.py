@@ -41,23 +41,19 @@ Use the available tools step by step to accomplish this goal. The primary object
 
     def _prepare_instances(self) -> List[Dict]:
         if Path(self.dataset_name_or_path).exists():
-            # Check if it's a JSON file
             if self.dataset_name_or_path.endswith(".json"):
                 with open(self.dataset_name_or_path, "r") as f:
                     data = json.load(f)
-                    # If it's our custom JSON format with instances data
                     if "instances" in data:
                         logger.info(
                             f"Loaded {len(data['instances'])} instances from JSON file"
                         )
                         if "metadata" in data and "statistics" in data["metadata"]:
                             logger.info(f"Statistics: {data['metadata']['statistics']}")
-                        # Create a simple dict that mimics HuggingFace dataset structure
                         dataset = {"test": data["instances"]}
                     elif "test" in data:
                         dataset = {"test": data["test"]}
                     else:
-                        # Assume the JSON file itself contains the instances
                         dataset = {"test": data if isinstance(data, list) else [data]}
                 dataset_name = os.path.basename(self.dataset_name_or_path).replace(
                     ".json", ""
@@ -85,7 +81,6 @@ Use the available tools step by step to accomplish this goal. The primary object
             if isinstance(dataset, (DatasetDict, IterableDatasetDict)):
                 split_instances = list(dataset[split])
             elif isinstance(dataset, dict) and split in dataset:
-                # Handle our custom JSON format
                 split_instances = dataset[split]
             else:
                 split_instances = list(dataset)
@@ -95,7 +90,6 @@ Use the available tools step by step to accomplish this goal. The primary object
         output_file = Path(self.output_dir) / f"{dataset_name}__retrieval.jsonl"
         output_file.parent.mkdir(parents=True, exist_ok=True)
 
-        # Check for both JSONL format (for legacy compatibility) and directory structure format
         remaining_instances, processed_count = self._filter_existing_instances(
             instances, output_file
         )
@@ -104,16 +98,13 @@ Use the available tools step by step to accomplish this goal. The primary object
             logger.info("All instances already processed")
             return []
 
-        # Apply max_instances limit if specified
         if self.max_instances is not None and self.max_instances > 0:
-            # Check if we've already processed enough instances
             if processed_count >= self.max_instances:
                 logger.info(
                     f"Already processed {processed_count} instances, which meets or exceeds max_instances={self.max_instances}. No more instances to process."
                 )
                 return []
 
-            # Calculate how many more instances we need to process
             remaining_needed = self.max_instances - processed_count
             if len(remaining_instances) > remaining_needed:
                 logger.info(
@@ -126,31 +117,13 @@ Use the available tools step by step to accomplish this goal. The primary object
     def _filter_existing_instances(
         self, instances: List[Dict], output_file: Path
     ) -> Tuple[List[Dict], int]:
-        """
-        Filter instances to exclude those that have already been processed.
-
-        This method supports both output formats:
-        1. JSONL format (legacy): results saved to a single JSONL file
-        2. Directory format: results saved to individual directories with result.json files
-
-        Args:
-            instances: List of instances to filter
-            output_file: Path to the JSONL output file (used for legacy format detection)
-
-        Returns:
-            Tuple of (remaining_instances, processed_count)
-        """
-        # First check JSONL format for backward compatibility
         if output_file.exists():
-            # JSONL format already handled by get_remaining_instances
             remaining_instances = get_remaining_instances(instances, output_file)
             processed_count = len(instances) - len(remaining_instances)
             return remaining_instances, processed_count
         else:
-            # Check directory structure format
             processed_instance_ids = set()
 
-            # Check if output directory exists and has subdirectories with result.json
             if os.path.exists(self.output_dir):
                 for item in os.listdir(self.output_dir):
                     instance_dir = os.path.join(self.output_dir, item)
@@ -164,7 +137,6 @@ Use the available tools step by step to accomplish this goal. The primary object
                     f"Found {processed_count} existing instances in directory format. Will skip them."
                 )
 
-            # Filter out already processed instances
             remaining_instances = [
                 instance
                 for instance in instances

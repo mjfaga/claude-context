@@ -1,29 +1,21 @@
 #!/usr/bin/env python3
-"""
-Claude Context End-to-End Test
-Use TypeScriptExecutor to call complete Claude Context workflow
-"""
 
 import os
 import sys
 from pathlib import Path
 
-# Add python directory to path
 sys.path.append(str(Path(__file__).parent))
 
 from ts_executor import TypeScriptExecutor
 
 
 def run_context_endtoend_test():
-    """Run Claude Context end-to-end test"""
-
-    # Configuration parameters
     config = {
         "openaiApiKey": os.environ.get("OPENAI_API_KEY", "your-openai-api-key"),
         "milvusAddress": os.environ.get("MILVUS_ADDRESS", "localhost:19530"),
         "codebasePath": str(
             Path(__file__).parent.parent / "packages" / "core" / "src"
-        ),  # Index core source code
+        ),
         "searchQuery": "embedding creation and vector database configuration",
     }
 
@@ -40,17 +32,14 @@ def run_context_endtoend_test():
     try:
         executor = TypeScriptExecutor()
 
-        # Call end-to-end test
         result = executor.call_method(
             "./test_context.ts", "testContextEndToEnd", config
         )
 
-        # Output results
         if result.get("success"):
             print("✅ End-to-end test successful!")
             print(f"📅 Timestamp: {result.get('timestamp')}")
 
-            # Display configuration info
             config_info = result.get("config", {})
             print(f"🔧 Configuration:")
             print(f"   - Embedding provider: {config_info.get('embeddingProvider')}")
@@ -60,13 +49,11 @@ def run_context_endtoend_test():
             print(f"   - Chunk size: {config_info.get('chunkSize')}")
             print(f"   - Chunk overlap: {config_info.get('chunkOverlap')}")
 
-            # Display indexing statistics
             index_stats = result.get("indexStats", {})
             print(f"📚 Indexing statistics:")
             print(f"   - Indexed files: {index_stats.get('indexedFiles', 0)}")
             print(f"   - Total chunks: {index_stats.get('totalChunks', 0)}")
 
-            # Display search results
             summary = result.get("summary", {})
             search_results = result.get("searchResults", [])
             print(f"🔍 Search results:")
@@ -74,7 +61,6 @@ def run_context_endtoend_test():
             print(f"   - Results found: {summary.get('foundResults', 0)} items")
             print(f"   - Average relevance: {summary.get('avgScore', 0):.3f}")
 
-            # Display top 3 search results
             if search_results:
                 print(f"📋 Top {min(3, len(search_results))} most relevant results:")
                 for i, item in enumerate(search_results[:3]):
@@ -102,7 +88,6 @@ def run_context_endtoend_test():
 
 
 def main():
-    """Main function"""
     print("=" * 60)
     print("🧪 Claude Context End-to-End Test")
     print("=" * 60)

@@ -20,9 +20,6 @@ export class SemanticSearchViewProvider implements vscode.WebviewViewProvider {
         this.configManager = configManager;
     }
 
-    /**
-     * Update the command instances (used when configuration changes)
-     */
     updateCommands(searchCommand: SearchCommand, indexCommand: IndexCommand, syncCommand: SyncCommand): void {
         this.searchCommand = searchCommand;
         this.indexCommand = indexCommand;
@@ -47,18 +44,14 @@ export class SemanticSearchViewProvider implements vscode.WebviewViewProvider {
             webviewView.webview
         );
 
-        // Check index status on load
         this.checkIndexStatusAndUpdateWebview(webviewView.webview);
 
-        // Send initial configuration data to webview
         this.sendCurrentConfig(webviewView.webview);
 
-        // Handle messages from webview
         webviewView.webview.onDidReceiveMessage(
             async message => {
                 switch (message.command) {
                     case 'checkIndex':
-                        // Handle index status check
                         await this.checkIndexStatusAndUpdateWebview(webviewView.webview);
                         return;
 
@@ -76,17 +69,14 @@ export class SemanticSearchViewProvider implements vscode.WebviewViewProvider {
 
                     case 'search':
                         try {
-                            // Use search command
                             const searchResults = await this.searchCommand.executeForWebview(
                                 message.text,
                                 50,
                                 Array.isArray(message.fileExtensions) ? message.fileExtensions : []
                             );
 
-                            // Convert SemanticSearchResult[] to webview format
                             const results = this.convertSearchResultsToWebviewFormat(searchResults);
 
-                            // Send results back to webview
                             webviewView.webview.postMessage({
                                 command: 'showResults',
                                 results: results,
@@ -97,7 +87,6 @@ export class SemanticSearchViewProvider implements vscode.WebviewViewProvider {
                         } catch (error) {
                             console.error('Search failed:', error);
                             vscode.window.showErrorMessage(`Search failed: ${error}`);
-                            // Send empty results to webview
                             webviewView.webview.postMessage({
                                 command: 'showResults',
                                 results: [],
@@ -107,18 +96,14 @@ export class SemanticSearchViewProvider implements vscode.WebviewViewProvider {
                         return;
 
                     case 'index':
-                        // Handle index command
                         try {
                             await this.indexCommand.execute();
-                            // Notify webview that indexing is complete and check index status
                             webviewView.webview.postMessage({
                                 command: 'indexComplete'
                             });
-                            // Update index status after completion
                             await this.checkIndexStatusAndUpdateWebview(webviewView.webview);
                         } catch (error) {
                             console.error('Indexing error:', error);
-                            // Still notify webview to reset button state
                             webviewView.webview.postMessage({
                                 command: 'indexComplete'
                             });
@@ -126,7 +111,6 @@ export class SemanticSearchViewProvider implements vscode.WebviewViewProvider {
                         return;
 
                     case 'openFile':
-                        // Handle file opening
                         try {
                             const workspaceFolders = vscode.workspace.workspaceFolders;
                             const workspaceRoot = workspaceFolders ? workspaceFolders[0].uri.fsPath : '';
@@ -135,15 +119,14 @@ export class SemanticSearchViewProvider implements vscode.WebviewViewProvider {
                             const document = await vscode.workspace.openTextDocument(uri);
                             const editor = await vscode.window.showTextDocument(document);
 
-                            // Select range from startLine to endLine if provided, otherwise just jump to line
                             if (message.startLine !== undefined && message.endLine !== undefined) {
-                                const startLine = Math.max(0, message.startLine - 1); // Convert to 0-based
-                                const endLine = Math.max(0, message.endLine - 1); // Convert to 0-based
+                                const startLine = Math.max(0, message.startLine - 1);
+                                const endLine = Math.max(0, message.endLine - 1);
                                 const range = new vscode.Range(startLine, 0, endLine, Number.MAX_SAFE_INTEGER);
                                 editor.selection = new vscode.Selection(range.start, range.end);
                                 editor.revealRange(range, vscode.TextEditorRevealType.InCenter);
                             } else if (message.line !== undefined) {
-                                const line = Math.max(0, message.line - 1); // Convert to 0-based
+                                const line = Math.max(0, message.line - 1);
                                 const range = new vscode.Range(line, 0, line, 0);
                                 editor.selection = new vscode.Selection(range.start, range.end);
                                 editor.revealRange(range, vscode.TextEditorRevealType.InCenter);
@@ -159,9 +142,6 @@ export class SemanticSearchViewProvider implements vscode.WebviewViewProvider {
         );
     }
 
-    /**
-     * Convert SemanticSearchResult[] from core to webview format
-     */
     private convertSearchResultsToWebviewFormat(searchResults: any[]): any[] {
         const workspaceFolders = vscode.workspace.workspaceFolders;
         const baseWorkspacePath = workspaceFolders ? workspaceFolders[0].uri.fsPath : '/tmp';
@@ -174,7 +154,6 @@ export class SemanticSearchViewProvider implements vscode.WebviewViewProvider {
 
             let displayPath = result.relativePath;
 
-            // Truncate content for display
             const truncatedContent = result.content && result.content.length <= 150
                 ? result.content
                 : (result.content || '').substring(0, 150) + '...';
@@ -193,9 +172,6 @@ export class SemanticSearchViewProvider implements vscode.WebviewViewProvider {
         });
     }
 
-    /**
-     * Check index status and update webview accordingly
-     */
     private async checkIndexStatusAndUpdateWebview(webview: vscode.Webview): Promise<void> {
         try {
             const workspaceFolders = vscode.workspace.workspaceFolders;
@@ -240,27 +216,22 @@ export class SemanticSearchViewProvider implements vscode.WebviewViewProvider {
 
     private async saveConfig(configData: any, webview: vscode.Webview) {
         try {
-            // Save embedding provider config
             const embeddingConfig: EmbeddingProviderConfig = {
                 provider: configData.provider,
                 config: configData.config
             };
             await this.configManager.saveEmbeddingProviderConfig(embeddingConfig);
 
-            // Save Milvus config
             if (configData.milvusConfig) {
                 await this.configManager.saveMilvusConfig(configData.milvusConfig);
             }
 
-            // Save splitter config
             if (configData.splitterConfig) {
                 await this.configManager.saveSplitterConfig(configData.splitterConfig);
             }
 
-            // Add a small delay to ensure configuration is fully saved
             await new Promise(resolve => setTimeout(resolve, 100));
 
-            // Notify extension to recreate Context with new config
             vscode.commands.executeCommand('semanticCodeSearch.reloadConfiguration');
 
             webview.postMessage({
@@ -281,7 +252,6 @@ export class SemanticSearchViewProvider implements vscode.WebviewViewProvider {
 
     private async testEmbedding(embeddingConfig: any, webview: vscode.Webview) {
         try {
-            // Test only embedding connection
             const embedding = ConfigManager.createEmbeddingInstance(embeddingConfig.provider, embeddingConfig.config);
             await embedding.embed('test embedding connection');
 

@@ -1,5 +1,3 @@
-// Chrome Extension Background Script with Milvus Integration
-// This replaces the IndexedDB-based storage with Milvus RESTful API
 
 import { ChromeMilvusAdapter, CodeChunk } from './milvus/chromeMilvusAdapter';
 import { MilvusConfigManager } from './config/milvusConfig';
@@ -12,7 +10,6 @@ const EMBEDDING_BATCH_SIZE = 100;
 const MAX_TOKENS_PER_BATCH = 250000;
 const MAX_CHUNKS_PER_BATCH = 100;
 
-// Cosine similarity function
 function cosSim(a: number[], b: number[]): number {
     let dot = 0;
     let normA = 0;
@@ -129,8 +126,8 @@ class MilvusVectorDB {
                 endLine: result.endLine,
                 fileExtension: result.fileExtension,
                 metadata: result.metadata,
-                score: result.score, // Include score for frontend display
-                vector: [] // Vector not needed for display
+                score: result.score,
+                vector: []
             }));
         } catch (error) {
             console.error('Failed to search in Milvus:', error);
@@ -141,7 +138,6 @@ class MilvusVectorDB {
     async clear(): Promise<void> {
         try {
             await this.adapter.clearCollection();
-            // Recreate the collection
             await this.adapter.createCollection(EMBEDDING_DIM);
         } catch (error) {
             console.error('Failed to clear Milvus collection:', error);
@@ -160,22 +156,20 @@ class MilvusVectorDB {
     }
 }
 
-// Code splitting functionality - using same parameters as VSCode extension
+// Chunking parameters match the VSCode extension's LangChain splitter defaults.
 function splitCode(content: string, language: string = '', chunkSize: number = 1000, chunkOverlap: number = 200): { content: string; startLine: number; endLine: number }[] {
     const lines = content.split('\n');
     const chunks: { content: string; startLine: number; endLine: number }[] = [];
 
-    // Simple character-based chunking that approximates LangChain's RecursiveCharacterTextSplitter
     let currentChunk: string[] = [];
     let currentSize = 0;
     let startLine = 1;
 
     for (let i = 0; i < lines.length; i++) {
         const line = lines[i];
-        const lineSize = line.length + 1; // +1 for newline
+        const lineSize = line.length + 1;
 
         if (currentSize + lineSize > chunkSize && currentChunk.length > 0) {
-            // Create chunk
             const chunkContent = currentChunk.join('\n');
             chunks.push({
                 content: chunkContent,
@@ -183,7 +177,6 @@ function splitCode(content: string, language: string = '', chunkSize: number = 1
                 endLine: startLine + currentChunk.length - 1
             });
 
-            // Create overlap - use line-based overlap instead of character-based
             const overlapLines = Math.min(
                 Math.floor(chunkOverlap / (chunkContent.length / currentChunk.length)),
                 currentChunk.length
@@ -210,7 +203,6 @@ function splitCode(content: string, language: string = '', chunkSize: number = 1
     return chunks.filter(chunk => chunk.content.trim().length > 0);
 }
 
-// GitHub API helpers (reused from original)
 async function validateGitHubToken(token: string): Promise<boolean> {
     try {
         const response = await fetch('https://api.github.com/user', {
@@ -249,7 +241,6 @@ async function getGitHubToken(): Promise<string> {
                 reject(new Error('GitHub token not found. Please configure your GitHub token in the extension settings.'));
             } else {
                 try {
-                    // Validate token before returning
                     await validateGitHubToken(items.githubToken);
                     resolve(items.githubToken);
                 } catch (error) {
@@ -260,7 +251,6 @@ async function getGitHubToken(): Promise<string> {
     });
 }
 
-// Check repository access
 async function checkRepositoryAccess(owner: string, repo: string): Promise<void> {
     const token = await getGitHubToken();
     const apiUrl = `https://api.github.com/repos/${owner}/${repo}`;
@@ -290,7 +280,6 @@ async function checkRepositoryAccess(owner: string, repo: string): Promise<void>
     }
 }
 
-// Rate limiting helper
 async function handleRateLimit(response: Response): Promise<void> {
     if (response.status === 403) {
         const remainingRequests = response.headers.get('X-RateLimit-Remaining');
@@ -300,7 +289,7 @@ async function handleRateLimit(response: Response): Promise<void> {
             const resetDate = new Date(parseInt(resetTime) * 1000);
             const waitTime = resetDate.getTime() - Date.now();
 
-            if (waitTime > 0 && waitTime < 3600000) { // Wait up to 1 hour
+            if (waitTime > 0 && waitTime < 3600000) {
                 console.log(`Rate limit exceeded. Waiting ${Math.ceil(waitTime / 1000)} seconds...`);
                 await new Promise(resolve => setTimeout(resolve, waitTime + 1000));
             } else {
@@ -313,7 +302,6 @@ async function handleRateLimit(response: Response): Promise<void> {
 async function fetchRepoFiles(owner: string, repo: string): Promise<any[]> {
     const token = await getGitHubToken();
 
-    // First get the default branch
     const repoInfoUrl = `https://api.github.com/repos/${owner}/${repo}`;
     const repoResponse = await fetch(repoInfoUrl, {
         headers: {
@@ -377,7 +365,6 @@ async function fetchFileContent(owner: string, repo: string, path: string): Prom
     throw new Error('File content not available');
 }
 
-// Main message handlers
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     if (request.action === 'indexRepo') {
         handleIndexRepo(request, sendResponse);
@@ -419,7 +406,6 @@ async function handleTestMilvusConnection(sendResponse: Function) {
             errorMessage = error;
         }
 
-        // Provide more specific error messages based on common issues
         if (errorMessage.includes('fetch')) {
             errorMessage = 'Network error: Unable to connect to Milvus server. Check address and network connectivity.';
         } else if (errorMessage.includes('CORS')) {
@@ -445,25 +431,20 @@ async function handleIndexRepo(request: any, sendResponse: Function) {
 
         sendResponse({ success: true, message: 'Starting indexing process...' });
 
-        // Check repository access first
         await checkRepositoryAccess(owner, repo);
 
-        // Initialize Milvus
         const vectorDB = new MilvusVectorDB(repoId);
         await vectorDB.initialize();
 
-        // Use fixed chunking configuration (same as VSCode extension)
-        const chunkSize = 1000;  // Same as VSCode extension default
-        const chunkOverlap = 200;  // Same as VSCode extension default
+        // Chunking values match the VSCode extension's LangChain splitter defaults.
+        const chunkSize = 1000;
+        const chunkOverlap = 200;
 
-        // Fetch repository files
         const files = await fetchRepoFiles(owner, repo);
         console.log(`Found ${files.length} files to index`);
 
-        // Process files using core package approach
         const result = await processFileList(files, owner, repo, repoId, vectorDB, chunkSize, chunkOverlap);
 
-        // Send completion message
         chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
             if (tabs[0]?.id) {
                 chrome.tabs.sendMessage(tabs[0].id, {
@@ -518,14 +499,12 @@ async function processFileList(
             const fileExtension = file.path.split('.').pop() || '';
             const chunks = splitCode(content, fileExtension, chunkSize, chunkOverlap);
 
-            // Log files with many chunks or large content
             if (chunks.length > 50) {
                 console.warn(`⚠️  File ${file.path} generated ${chunks.length} chunks (${Math.round(content.length / 1024)}KB)`);
             } else if (content.length > 100000) {
                 console.log(`📄 Large file ${file.path}: ${Math.round(content.length / 1024)}KB -> ${chunks.length} chunks`);
             }
 
-            // Add chunks to buffer
             for (let j = 0; j < chunks.length; j++) {
                 const chunk = chunks[j];
                 if (chunk.content.trim().length > 10) {
@@ -546,7 +525,6 @@ async function processFileList(
                     chunkBuffer.push({ chunk: codeChunk, repoId });
                     totalChunks++;
 
-                    // Process batch when buffer reaches EMBEDDING_BATCH_SIZE
                     if (chunkBuffer.length >= EMBEDDING_BATCH_SIZE) {
                         try {
                             await processChunkBuffer(chunkBuffer, vectorDB);
@@ -561,7 +539,6 @@ async function processFileList(
 
             processedFiles++;
 
-            // Send progress update
             chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
                 if (tabs[0]?.id) {
                     chrome.tabs.sendMessage(tabs[0].id, {
@@ -576,7 +553,6 @@ async function processFileList(
         }
     }
 
-    // Process any remaining chunks in the buffer
     if (chunkBuffer.length > 0) {
         console.log(`📝 Processing final batch of ${chunkBuffer.length} chunks`);
         try {
@@ -595,10 +571,8 @@ async function processChunkBuffer(
 ): Promise<void> {
     if (chunkBuffer.length === 0) return;
 
-    // Extract chunks
     const chunks = chunkBuffer.map(item => item.chunk);
 
-    // Estimate tokens (rough estimation: 1 token ≈ 4 characters)
     const estimatedTokens = chunks.reduce((sum, chunk) => sum + Math.ceil(chunk.content.length / 4), 0);
 
     console.log(`🔄 Processing batch of ${chunks.length} chunks (~${estimatedTokens} tokens)`);
@@ -606,17 +580,14 @@ async function processChunkBuffer(
 }
 
 async function processChunkBatch(chunks: CodeChunk[], vectorDB: MilvusVectorDB): Promise<void> {
-    // Generate embedding vectors using batch processing
     const chunkContents = chunks.map(chunk => chunk.content);
     const embeddings: number[][] = await EmbeddingModel.embedBatch(chunkContents);
 
-    // Add embeddings to chunks
     const chunksWithEmbeddings = chunks.map((chunk, index) => ({
         ...chunk,
         vector: embeddings[index]
     }));
 
-    // Store to vector database
     await vectorDB.addChunks(chunksWithEmbeddings);
 }
 
@@ -625,14 +596,11 @@ async function handleSearchCode(request: any, sendResponse: Function) {
         const { query, owner, repo } = request;
         const repoId = `${owner}/${repo}`;
 
-        // Initialize Milvus
         const vectorDB = new MilvusVectorDB(repoId);
         await vectorDB.initialize();
 
-        // Get query embedding using batch processing (single query)
         const queryEmbedding = await EmbeddingModel.embedSingle(query);
 
-        // Search similar chunks
         const results = await vectorDB.searchSimilar(queryEmbedding, 20);
 
         await IndexedRepoManager.updateLastSearchTime(repoId);

@@ -1,14 +1,10 @@
 #!/usr/bin/env python3
-"""
-Generate swe_verified_15min1h_2files_instances.json from the subset analysis
-"""
 
 import json
 import re
 from datasets import load_dataset
 
 def parse_patch_files(patch_content):
-    """Parse patch content to extract the number of modified files"""
     if not patch_content:
         return []
     
@@ -30,24 +26,21 @@ def main():
     
     print("Filtering instances for: 15min-1hour difficulty + 2 patch files...")
     
-    # Filter for the specific subset
     subset_instances = []
     
     for instance in instances:
         difficulty = instance.get('difficulty', 'Unknown')
         
-        # Parse main patch to count files
         patch_content = instance.get('patch', '')
         patch_files = parse_patch_files(patch_content)
         oracle_count = len(patch_files)
         
-        # Check if it matches our criteria
         if difficulty == '15 min - 1 hour' and oracle_count == 2:
             subset_instances.append(instance)
     
     print(f"Found {len(subset_instances)} instances matching criteria")
     
-    # Create the JSON structure that _prepare_instances expects
+    # _prepare_instances expects this JSON structure
     output_data = {
         "metadata": {
             "description": "SWE-bench_Verified subset: 15min-1hour difficulty with 2 patch files",
@@ -67,14 +60,12 @@ def main():
         "instances": subset_instances
     }
     
-    # Save to JSON file
     output_file = "swe_verified_15min1h_2files_instances.json"
     with open(output_file, 'w') as f:
         json.dump(output_data, f, indent=2)
     
     print(f"Generated {output_file} with {len(subset_instances)} instances")
     
-    # Verify the structure
     print("\nVerifying JSON structure...")
     with open(output_file, 'r') as f:
         loaded_data = json.load(f)
